@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#173e34">
+  <title>Bela — workbench</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <script src="/preferences.js"></script>
+  <script src="/locale.js" defer></script>
+  <script src="/i18n.js" defer></script>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <a class="brand" href="/" aria-label="Bela home"><span class="brand-mark">♣</span><span>Bela<span class="brand-sub">WORKBENCH</span></span></a>
+    <div class="nav-caption">WORKSPACE</div>
+    <nav aria-label="Main navigation">
+      <button class="nav-item active" data-view="table"><span class="nav-icon">♠</span> Game table</button>
+      <button class="nav-item" data-view="history"><span class="nav-icon">↶</span> Event history</button>
+      <button class="nav-item" data-view="saved"><span class="nav-icon">▤</span> My matches <span id="saved-count" class="nav-count">0</span></button>
+      <button class="nav-item" data-view="help"><span class="nav-icon">?</span> Rules and help</button>
+    </nav>
+    <div class="sidebar-bottom"><div class="local-status"><span class="status-dot"></span> Running locally</div><p>One hand. All public information.<br>A clear view of the game.</p><div class="prototype">PROTOTYPE <span>0.5</span></div></div>
+  </aside>
+
+  <main>
+    <header class="page-header"><div><div class="eyebrow">BELA LAB <span class="tiny-dot">·</span> CROATIAN BELA</div><h1 id="page-title">Game table</h1><p id="page-subtitle">Track the game. Check moves. Develop strategy.</p></div><div class="header-actions"><div class="preferences"><select id="language-select" aria-label="Language"><option value="en">English</option><option value="hr">Hrvatski</option></select><button id="theme-toggle" class="button secondary" type="button" aria-pressed="false">Night mode</button></div><button id="demo" class="button secondary">Try demo <span>↗</span></button><button id="new-match" class="button primary"><span>＋</span> New match</button></div></header>
+    <div id="error-banner" class="error-banner" role="alert" hidden><span id="error-text"></span><button id="dismiss-error" aria-label="Dismiss notification">×</button></div>
+
+    <section id="view-table" class="view">
+      <div class="score-strip" id="score-strip"></div>
+      <div class="workspace">
+        <div class="play-column">
+          <section class="panel board-panel"><div class="panel-heading"><div><span class="section-kicker">CURRENT DEAL</span><h2 id="match-name">Your next move starts here</h2></div><span id="phase-badge" class="pill">Ready to play</span></div><div id="table-board" class="table-board"></div><div class="board-footer"><span id="turn-message">Open a demo or start a new match.</span><button id="edit-setup" class="text-button" hidden>Edit setup ↗</button></div></section>
+          <section class="panel hand-panel"><div class="panel-heading"><div><span class="section-kicker">ONLY YOUR CARDS</span><h2>Your hand <span id="hand-count" class="muted-count">0 / 8</span></h2></div><span class="legend"><span class="legal-dot"></span> Legal move</span></div><div id="my-hand" class="my-hand"></div><div class="hand-note" id="hand-note">Other players' unrevealed cards stay hidden.</div></section>
+          <div class="small-metrics" id="small-metrics"></div>
+        </div>
+
+        <aside class="input-column">
+          <section class="panel input-panel"><div class="tab-bar" role="tablist" aria-label="Event type"><button id="tab-play" class="tab active" role="tab" aria-selected="true" data-tab="play">Record a move</button><button id="tab-meld" class="tab" role="tab" aria-selected="false" data-tab="meld">Melds</button></div>
+            <div id="input-play" class="input-body"><div class="input-head"><span id="actor-badge" class="avatar small">—</span><div><strong id="actor-name">Player to act</strong><p id="actor-detail">Open a match first.</p></div></div><div class="field-caption">SELECT THE PLAYED CARD</div><div id="play-picker" class="compact-picker"></div><div class="selection-line" id="selection-line">No card selected.</div><label class="checkbox-line"><input type="checkbox" id="play-bela"> Bela was announced with this card</label><button id="submit-play" class="button primary full" disabled>Record move <span>→</span></button><p class="input-hint" id="play-hint">Cards are sorted by suit, not by recommendation.</p></div>
+            <div id="input-meld" class="input-body" hidden><label>Player<select id="meld-player"><option value="0">Player 0</option><option value="1">Player 1</option><option value="2">Player 2</option><option value="3">Player 3</option></select></label><label>What is publicly known?<select id="meld-type"><option value="reveal">Revealed cards</option><option value="meld_value">Strongest meld value</option><option value="sequence_high">Sequence high card</option><option value="presence">Has / has no melds</option><option value="belot">Belot</option></select></label><div id="meld-fields"></div><button id="submit-meld" class="button secondary full">Add information ＋</button><div class="declaration-close"><h3>Finish ordinary declarations</h3><p>First record all revealed melds of the winning team.</p><select id="declaration-winner" aria-label="Who won the meld contest"><option value="none">No ordinary melds</option><option value="0">Team 0 · players 0 and 2</option><option value="1">Team 1 · players 1 and 3</option></select><button id="finish-melds" class="button primary full">Confirm and start play →</button></div></div>
+          </section>
+          <section class="insight-panel"><div class="insight-icon">✧</div><div><h3>Room for the next step</h3><p>Move comparisons and their chances will appear here. For now, we validate the rules and track the game.</p><span class="development-label">Statistical model coming later</span></div></section>
+          <section class="panel recent-panel"><div class="mini-heading"><h3>Recent events</h3><button class="text-button" data-view="history">All events ↗</button></div><div id="recent-events"></div><button id="undo" class="undo-button" disabled>↶ Undo last event</button></section>
+        </aside>
+      </div>
+      <div class="bottom-bar"><span id="save-status"><span class="status-dot"></span> Changes are saved automatically</span><div><button id="next-deal" class="button secondary" hidden>Next deal →</button><button id="export" class="text-button" disabled>Download archive ↓</button></div></div>
+    </section>
+
+    <section id="view-history" class="view" hidden><div class="panel history-panel"><div class="panel-heading"><div><span class="section-kicker">VERIFIABLE HISTORY</span><h2>Every event has its place</h2><p>Corrections revalidate all subsequent moves. Previous versions remain in the archive.</p></div><button id="insert-first" class="button secondary">＋ Insert at start</button></div><div id="history-content"></div></div><section class="panel deal-history"><h2>Deals in this match</h2><div id="deal-history"></div></section></section>
+    <section id="view-saved" class="view" hidden><div class="panel library-panel"><div class="panel-heading"><div><span class="section-kicker">PICK UP WHERE YOU LEFT OFF</span><h2>Saved matches</h2><p>Dashboard matches are saved locally after every valid event.</p></div><button id="import" class="button secondary">Import file ↑</button></div><div id="library-content"></div></div></section>
+    <section id="view-help" class="view" hidden><div class="help-grid"><section class="panel help-copy"><span class="section-kicker">HOW TO USE THE WORKBENCH</span><h2>Track what you know.</h2><ol><li><strong>Set up the deal.</strong> Enter your starting hand, trump, dealer, caller and score.</li><li><strong>Record declarations.</strong> Enter spoken details and revealed cards, then confirm who won the meld contest.</li><li><strong>Track every move.</strong> Select the card played at the table. On your turn, you can also select a card from your hand.</li><li><strong>Correct and continue.</strong> History supports replacement, insertion and deletion. Every valid change is saved automatically.</li></ol><button id="open-rules" class="button primary">Read the agreed rules ↗</button></section><section class="panel help-copy"><span class="section-kicker">CLEAR BOUNDARIES</span><h2>No invented information.</h2><p>Other players' unrevealed hands remain unknown. The engine checks whether a legal deal can explain the recorded history.</p><p>Complex validation may reach its computation limit. The change then remains unconfirmed and the previous state is preserved.</p><p>This version starts with eight cards after the talon. Statistical recommendations and trump advice will follow later.</p><div class="help-team"><strong>Team 0</strong> players 0 + 2 <span>·</span> <strong>Team 1</strong> players 1 + 3</div></section></div></section>
+    <footer class="app-footer"><span>BELA · WORKING PROTOTYPE</span><span>Accurate play first. Better moves next.</span></footer>
+  </main>
+
+  <dialog id="setup-dialog"><form id="setup-form"><div class="dialog-heading"><div><span class="section-kicker">DEAL SETUP</span><h2 id="setup-title">New match</h2></div><button type="button" class="close-button" data-close="setup-dialog" aria-label="Close">×</button></div><div id="setup-error" class="form-error" role="alert" hidden></div><div class="form-grid"><label class="span-two">Match name<input id="setup-name" maxlength="200" required value="My match"></label><label>Your seat<select id="setup-player"><option>0</option><option>1</option><option>2</option><option>3</option></select></label><label>Dealer<select id="setup-dealer"><option>0</option><option>1</option><option>2</option><option selected>3</option></select></label><label>Caller<select id="setup-caller"><option>0</option><option>1</option><option>2</option><option>3</option></select></label><label>Trump<select id="setup-trump"><option value="H">♥ Hearts</option><option value="S">♠ Spades</option><option value="D">♦ Diamonds</option><option value="C">♣ Clubs</option></select></label><label>Team 0 score<input id="setup-score0" type="number" min="0" step="1" required value="0"></label><label>Team 1 score<input id="setup-score1" type="number" min="0" step="1" required value="0"></label></div><div class="picker-heading"><strong>Starting eight cards</strong><span id="setup-selected">0 / 8 selected</span></div><div id="setup-picker" class="large-picker"></div><p class="input-hint">Enter your hand after picking up the talon. Seats 0–3 follow the order of play.</p><div class="dialog-actions"><button type="button" class="button secondary" data-close="setup-dialog">Cancel</button><button type="submit" id="setup-submit" class="button primary">Open match →</button></div></form></dialog>
+
+  <dialog id="event-dialog"><form id="event-form"><div class="dialog-heading"><div><span class="section-kicker">EDIT HISTORY</span><h2 id="event-title">Correct event</h2></div><button type="button" class="close-button" data-close="event-dialog" aria-label="Close">×</button></div><div id="event-error" class="form-error" role="alert" hidden></div><div class="form-grid"><label>Event type<select id="edit-type"><option value="play">Played card</option><option value="reveal">Revealed cards</option><option value="presence">Has / has no melds</option><option value="meld_value">Meld value</option><option value="sequence_high">Sequence high card</option><option value="finish_declarations">Declarations finished</option><option value="belot">Belot</option></select></label><label id="edit-player-label">Player<select id="edit-player"><option>0</option><option>1</option><option>2</option><option>3</option></select></label></div><div id="edit-fields"></div><div class="dialog-actions"><button type="button" class="button secondary" data-close="event-dialog">Cancel</button><button type="submit" class="button primary">Validate and save →</button></div></form></dialog>
+  <dialog id="rules-dialog"><div class="dialog-heading"><h2>Agreed rules</h2><button class="close-button" data-close="rules-dialog" aria-label="Close">×</button></div><pre id="rules-content"></pre></dialog>
+  <input type="file" id="import-file" accept=".json,application/json" hidden>
+  <div id="toast" class="toast" role="status" hidden></div>
+</body>
+</html>

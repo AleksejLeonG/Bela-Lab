@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "ruleset_version": "hr-bela-1.0",
+  "match": {
+    "id": "0a31145d-fdba-472f-b60e-5a0854991e22",
+    "name": "Saved match example",
+    "deals": [
+      {
+        "initial": {
+          "hands": [
+            [
+              "H_Q",
+              "H_K",
+              "S_9",
+              "S_10",
+              "S_A",
+              "D_K",
+              "C_8",
+              "C_9"
+            ],
+            [
+              "S_8",
+              "S_J",
+              "S_K",
+              "D_7",
+              "D_10",
+              "D_J",
+              "C_7",
+              "C_J"
+            ],
+            [
+              "H_8",
+              "H_9",
+              "H_10",
+              "S_Q",
+              "D_8",
+              "D_9",
+              "D_Q",
+              "C_K"
+            ],
+            [
+              "H_7",
+              "H_J",
+              "H_A",
+              "S_7",
+              "D_A",
+              "C_10",
+              "C_Q",
+              "C_A"
+            ]
+          ],
+          "trump": "H",
+          "dealer": 3,
+          "caller": 0,
+          "match_score": [
+            0,
+            0
+          ]
+        },
+        "actions": [
+          {
+            "type": "resolve_declarations"
+          },
+          {
+            "type": "play_card",
+            "player": 0,
+            "card": "H_Q",
+            "bela": true
+          },
+          {
+            "type": "play_card",
+            "player": 1,
+            "card": "S_8",
+            "bela": false
+          },
+          {
+            "type": "play_card",
+            "player": 2,
+            "card": "H_9",
+            "bela": false
+          },
+          {
+            "type": "play_card",
+            "player": 3,
+            "card": "H_J",
+            "bela": false
+          },
+          {
+            "type": "play_card",
+            "player": 3,
+            "card": "H_7",
+            "bela": false
+          }
+        ]
+      }
+    ]
+  }
+}

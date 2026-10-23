@@ -1,0 +1,93 @@
+{
+  "format": "bela-player-session",
+  "schema_version": 1,
+  "ruleset_version": "hr-bela-1.0",
+  "id": "8a7f39f6-5cd5-4503-b632-646a70c0eb1e",
+  "name": "Demo player match",
+  "initial": {
+    "player": 0,
+    "hand": [
+      "H_Q",
+      "H_K",
+      "S_9",
+      "S_10",
+      "S_A",
+      "D_K",
+      "C_8",
+      "C_9"
+    ],
+    "dealer": 3,
+    "caller": 0,
+    "trump": "H",
+    "match_score": [
+      0,
+      0
+    ]
+  },
+  "commands": [
+    {
+      "type": "add",
+      "event": {
+        "type": "reveal",
+        "player": 2,
+        "cards": [
+          "H_8",
+          "H_9",
+          "H_10"
+        ]
+      }
+    },
+    {
+      "type": "add",
+      "event": {
+        "type": "finish_declarations",
+        "winning_team": 0
+      }
+    },
+    {
+      "type": "add",
+      "event": {
+        "type": "play",
+        "player": 0,
+        "card": "H_Q",
+        "bela": true
+      }
+    },
+    {
+      "type": "add",
+      "event": {
+        "type": "play",
+        "player": 1,
+        "card": "S_8",
+        "bela": false
+      }
+    },
+    {
+      "type": "add",
+      "event": {
+        "type": "play",
+        "player": 2,
+        "card": "H_9",
+        "bela": false
+      }
+    },
+    {
+      "type": "add",
+      "event": {
+        "type": "play",
+        "player": 3,
+        "card": "H_J",
+        "bela": false
+      }
+    },
+    {
+      "type": "add",
+      "event": {
+        "type": "play",
+        "player": 3,
+        "card": "H_7",
+        "bela": false
+      }
+    }
+  ]
+}
