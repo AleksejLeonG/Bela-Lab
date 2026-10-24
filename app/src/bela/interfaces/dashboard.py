@@ -11,6 +11,7 @@ from uuid import UUID, uuid4
 import webbrowser
 
 from bela.interfaces.localization import CROATIAN, translate
+from bela.interfaces.analysis_jobs import AnalysisBusy, AnalysisJobs, interactive_config
 from bela.analysis.knowledge import knowledge_view
 from bela.domain.cards import Card
 from bela.domain.melds import BelotResult
@@ -80,6 +81,7 @@ class Dashboard:
         self.storage, self.example = Path(storage), Path(example)
         self.match = None
         self.lock = threading.RLock()
+        self.analysis = AnalysisJobs()
 
     def _path(self, match_id):
         if not isinstance(match_id, str) or str(UUID(match_id)) != match_id:
@@ -145,7 +147,37 @@ class Dashboard:
             # Commit memory only after persistence succeeds.
             save_user_match(candidate, self._path(candidate.id))
             self.match = candidate
+            self.analysis.invalidate()
             return self.snapshot()
+
+    def analysis_request(self, route, payload):
+        with self.lock:
+            if not isinstance(payload, dict):
+                raise ValueError("Expected a request object.")
+            match = self.match
+            if match is None:
+                raise ValueError("Open or create a match first.")
+            if (payload.get("expected_id") != match.id
+                    or type(payload.get("expected_revision")) is not int
+                    or payload["expected_revision"] != match.revision):
+                raise StaleRevision("The match changed in another window. Refresh and try again.")
+            context = {"expected_id", "expected_revision"}
+            if route == "/api/analysis/start":
+                _object(payload, context | {"config"}, "analysis")
+                job_id = self.analysis.start(match, interactive_config(payload["config"]))
+            elif route == "/api/analysis/cancel":
+                _object(payload, context | {"job_id"}, "analysis cancellation")
+                job_id = payload["job_id"]
+                self.analysis.cancel(job_id)
+            else:
+                raise ValueError("Unknown analysis action.")
+            return self.analysis.view(job_id, (match.id, match.revision, len(match.deals)))
+
+    def analysis_view(self, job_id):
+        with self.lock:
+            match = self.match
+            source = None if match is None else (match.id, match.revision, len(match.deals))
+        return self.analysis.view(job_id, source)
 
 
 def make_server(dashboard: Dashboard, port=8765):
@@ -189,6 +221,11 @@ def make_server(dashboard: Dashboard, port=8765):
             path = urlsplit(self.path).path
             if path == "/api/state":
                 self._json(200, dashboard.snapshot())
+            elif path == "/api/analysis":
+                try:
+                    self._json(200, dashboard.analysis_view(parse_qs(urlsplit(self.path).query).get("id", [None])[0]))
+                except ValueError as error:
+                    self._json(404, {"error": str(error)})
             elif path == "/api/knowledge":
                 with dashboard.lock:
                     match = dashboard.match
@@ -218,7 +255,7 @@ def make_server(dashboard: Dashboard, port=8765):
                 raw = ("const CROATIAN = " + json.dumps(CROATIAN, ensure_ascii=False) + ";").encode("utf-8")
                 self._headers(200, "text/javascript; charset=utf-8", len(raw))
                 self.wfile.write(raw)
-            elif path in ("/", "/app.js", "/knowledge.js", "/i18n.js", "/preferences.js", "/style.css", "/favicon.svg"):
+            elif path in ("/", "/app.js", "/advice.js", "/knowledge.js", "/i18n.js", "/preferences.js", "/style.css", "/favicon.svg"):
                 file = WEB_ROOT / ("index.html" if path == "/" else path[1:])
                 raw = file.read_bytes()
                 content_type = {".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml"}[file.suffix]
@@ -244,7 +281,12 @@ def make_server(dashboard: Dashboard, port=8765):
                     return
                 payload = json.loads(raw.decode("utf-8"),
                                      object_pairs_hook=_unique_object, parse_constant=_invalid_constant)
-                self._json(200, dashboard.mutate(urlsplit(self.path).path, payload))
+                route = urlsplit(self.path).path
+                result = dashboard.analysis_request(route, payload) if route in (
+                    "/api/analysis/start", "/api/analysis/cancel") else dashboard.mutate(route, payload)
+                self._json(200, result)
+            except AnalysisBusy as error:
+                self._json(409, {"error": str(error), "code": "analysis_busy"})
             except StaleRevision as error:
                 self._json(409, {"error": str(error), "code": "stale_revision"})
             except ValidationLimit as error:
@@ -278,4 +320,5 @@ def main(argv=None):
     except KeyboardInterrupt:
         pass
     finally:
+        dashboard.analysis.invalidate()
         server.server_close()

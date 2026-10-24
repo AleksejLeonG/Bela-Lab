@@ -6,7 +6,15 @@ Use [RULES.md](RULES.md) for game behavior and [FRAMEWORK.md](FRAMEWORK.md) for 
 
 Implemented: rule library, complete simulator, melds/bela/belot, scoring, versioned simulator and player sessions, own-hand/public-event tracking, consistent-hidden-allocation validation, history corrections, autosave, text input and local dashboard. The dashboard supports English/Croatian and persistent light/dark preferences.
 
-Statistical sampling and ranking are not implemented. The early visual dashboard makes the engine easier to test; its existence does not mean the statistical phases below are complete.
+Uniform hidden-hand sampling, a verified simulation bridge and the first paired [Monte Carlo advisor](MONTE_CARLO.md) are implemented. Move advice is available in the dashboard with explicit policies, settled-point/contract objectives and conservative uncertainty. Stronger playing policies, search and match strategy remain to be validated.
+
+Current scope: keep the uniform hidden-deal model and defer learning individual
+player behavior. The default advisor samples a [hidden five-strategy mix](STRATEGIES.md),
+with a profile fixed for each other player throughout each hypothetical match.
+These assignments are unknown to our simulated player. Score-aware
+match strategy is deferred; revisit it especially when either team approaches
+roughly 800 points or more. This is a development priority, not a change to the
+agreed victory rules or a fixed mathematical cutoff for score relevance.
 
 Validation performance has been improved with early meld/capacity pruning and rechecked private witness reuse. [VALIDATION.md](VALIDATION.md) records the method, benchmarks and independent correctness checks; the original computation budget is unchanged.
 
@@ -21,7 +29,7 @@ Validation performance has been improved with early meld/capacity pruning and re
 | 5. Stronger search | Better time allocation, ISMCTS or justified alternative, multiple policies and independent final validation | Measure improvement against a frozen baseline on held-out deals with seat/team swaps and paired intervals; identify close choices; complexity alone is not success |
 | 6. Match strategy | Future deals, total score, next dealer and calling policies | Compare identical hands at different scores; test when risk preferences should change; verify terminal outcomes and calibration on independent simulated matches |
 | 7. App integration | Input, knowledge and revision-linked advice in the dashboard | Enter an entire deal without development tools; correct early mistakes, resume saves and reject stale analysis; readable phone layout; latency budgets established by measurement |
-| 8. Trump advice | Four suits or pass from six cards, unknown own talon and remaining callers | Never use future talon cards; forced dealer cannot pass; passing simulates later decisions; finish calling before play |
+| 8. Trump advice | Local six-card heuristic baseline implemented; statistical calling remains future work | Baseline rejects talon input and enforces dealer calling. Future statistical advice must also simulate later callers when evaluating pass |
 | 9. Advanced input | Partial histories, text/voice, confirmed image recognition, retrospective analysis and opponent models | Prioritize demonstrated benefit; retain the same event/rules boundary; measure data requirements and information leakage |
 
 Calibration in the simulator is separate from quality against humans. A model predicting around 70% should win about that often under its stated continuation model. Real match archives provide a later independent validation source.
@@ -40,4 +48,10 @@ Keep development and evaluation scenarios separate. Do not silently tune against
 
 ## Next implementation
 
-Use recorded real situations to improve input and validation, then add a statistically verified sampler over the existing hard constraints. Connect legal-move analysis to the same player observations. The first advisor should clearly rank **deal outcomes** until a separate match-continuation model exists.
+Review the [single online practice test](ONLINE_PRACTICE.md), especially its
+capture gap, before another online deal. Calling uses the explained six-card
+heuristic, while move advice uses the sampler and paired Monte Carlo. A
+standalone online connector and ten-game test remain unfinished. Keep the
+engine and connection local without paid model services. Add statistical calling only with explicit models
+for unseen talon cards and subsequent callers; keep deal and match outcomes
+distinct.

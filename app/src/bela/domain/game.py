@@ -49,7 +49,8 @@ class PlayState:
     Construct through simulation.start_play or SimulationBridge; do not pass
     this to a policy.
     Declarations must be resolved (or belot declared) before the first card.
-    Bidding and session revisions are not implemented yet.
+    Pre-talon calling is modeled separately in gameplay.calling; this state
+    begins only after a call and talon pickup.
     """
 
     hands: tuple[frozenset[Card], ...]

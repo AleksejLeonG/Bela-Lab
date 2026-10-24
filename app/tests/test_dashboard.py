@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import tempfile
 import threading
+from time import monotonic, sleep
 import unittest
 from unittest.mock import patch
 
@@ -106,6 +107,7 @@ class HttpDashboardTests(unittest.TestCase):
         self.addCleanup(self.cleanup_server)
 
     def cleanup_server(self):
+        self.dashboard.analysis.invalidate()
         self.server.shutdown()
         self.server.server_close()
         self.thread.join(timeout=5)
@@ -124,7 +126,7 @@ class HttpDashboardTests(unittest.TestCase):
         return self.request("POST", path, json.dumps(payload), {"Content-Type": "application/json"})
 
     def test_static_assets_rules_and_no_directory_traversal(self):
-        for path in ("/", "/app.js", "/knowledge.js", "/i18n.js", "/preferences.js", "/locale.js", "/style.css", "/favicon.svg", "/api/rules"):
+        for path in ("/", "/app.js", "/advice.js", "/knowledge.js", "/i18n.js", "/preferences.js", "/locale.js", "/style.css", "/favicon.svg", "/api/rules"):
             with self.subTest(path=path):
                 status, headers, body = self.request("GET", path)
                 self.assertEqual(status, 200)
@@ -183,3 +185,33 @@ class HttpDashboardTests(unittest.TestCase):
         self.assertEqual(self.request("POST", "/api/new", "not JSON", {"Content-Type": "text/plain"})[0], 415)
         self.assertEqual(self.request("POST", "/api/new", "not JSON", {"Content-Type": "application/json"})[0], 422)
         self.assertEqual(self.request("GET", "/api/export")[0], 404)
+
+    def test_analysis_http_job_is_read_only_and_rejects_stale_context(self):
+        _, _, body = self.post("/api/demo", {"expected_id": None, "expected_revision": 0})
+        match = json.loads(body)["match"]
+        before = self.dashboard._path(match["id"]).read_bytes()
+        payload = {"expected_id": match["id"], "expected_revision": match["revision"],
+                   "config": {"samples": 4, "seconds": 1, "seed": 9,
+                              "policy": "random_v1", "objective": "contract_success"}}
+        status, _, body = self.post("/api/analysis/start", payload)
+        self.assertEqual(status, 200)
+        job_id = json.loads(body)["id"]
+        deadline = monotonic() + 3
+        while monotonic() < deadline:
+            status, _, body = self.request("GET", "/api/analysis?id=" + job_id)
+            job = json.loads(body)
+            if job["state"] == "finished":
+                break
+            sleep(.01)
+        self.assertEqual(job["state"], "finished")
+        self.assertEqual(job["result"]["status"], "forced_move")
+        self.assertEqual(self.dashboard._path(match["id"]).read_bytes(), before)
+        self.assertEqual(self.request("GET", "/api/analysis?id=missing")[0], 404)
+        self.assertEqual(self.post("/api/analysis/start", {**payload, "expected_revision": 0})[0], 409)
+        self.assertEqual(self.post("/api/command", {"expected_id": match["id"],
+            "expected_revision": match["revision"], "command": {"type": "add", "event": {
+                "type": "play", "player": 0, "card": "H_K", "bela": False}}})[0], 200)
+        _, _, body = self.request("GET", "/api/analysis?id=" + job_id)
+        stale = json.loads(body)
+        self.assertEqual(stale["state"], "stale")
+        self.assertIsNone(stale["result"])

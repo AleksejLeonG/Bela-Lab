@@ -2,6 +2,19 @@
 
 The browser dashboard tests the existing Python engine on your computer. No external account, service or extra runtime package is required. Double-click **START_BELA.cmd**, or run `python app/run.py`. The default address is `http://127.0.0.1:8765`. Keep the launcher window open; Ctrl+C stops it. Use `--port 8766` if needed or `--no-browser` to suppress automatic opening.
 
+## Move advice
+
+Open **Move advice** on your turn after confirming ordinary declarations. Choose
+the ranking objective, simulated-player strategy, shared trial count and seed,
+then **Compare moves**. Results show expected settled points, contract/defensive
+success and conservative 95% ranges. Analysis runs for up to eight seconds and
+can be stopped. Recording or correcting an event cancels outdated work and clears
+old estimates. Clicking a result only selects that card at the table.
+
+These estimates depend on the selected policy and a uniform model of consistent
+hidden deals. Unresolved choices are not proven equal. Future match victory and
+optimal play are not estimated. See [MONTE_CARLO.md](MONTE_CARLO.md).
+
 ## Language and appearance
 
 English is the default. Select **Hrvatski** for Croatian. The **Night mode** button switches to a dark theme and becomes **Day mode**. Both preferences persist in browser local storage and are independent of matches. Switching preserves selected cards and entered form values. Match names, card identifiers and saved event data are not translated.

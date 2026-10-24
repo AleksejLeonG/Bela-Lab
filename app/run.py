@@ -12,6 +12,15 @@ if __name__ == "__main__":
     if arguments and arguments[0] in ("--text", "--tekst"):
         from bela.interfaces.player_cli import main
         main(arguments[1:])
+    elif arguments and arguments[0] == "--batch":
+        from bela.interfaces.batch_cli import main
+        raise SystemExit(main(arguments[1:]))
+    elif arguments and arguments[0] == "--practice-advice":
+        from bela.interfaces.practice_advice import main
+        main(arguments[1:])
+    elif arguments and arguments[0] == "--trump":
+        from bela.interfaces.trump_cli import main
+        main(arguments[1:])
     elif arguments and arguments[0] == "--simulator":
         from bela.interfaces.simulator_cli import main
         sys.argv = [sys.argv[0], *arguments[1:]]

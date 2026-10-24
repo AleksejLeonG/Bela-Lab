@@ -121,7 +121,7 @@ $env:PYTHONPATH = "$PWD/app/src"
 python -m unittest discover -s app/tests -p test_simulation_bridge.py
 ```
 
-Next establish explicit continuation policies, evaluation objectives and
-uncertainty reporting, then use this bridge to compare legal moves across shared
-sampled deals. These tests establish finite regression evidence, not a proof of
-optimal play or empirical playing strength.
+The [Monte Carlo advisor](MONTE_CARLO.md) now uses this bridge with explicit
+continuation policies, evaluation objectives and uncertainty reporting. These
+tests establish finite regression evidence, not a proof of optimal play or
+empirical playing strength.

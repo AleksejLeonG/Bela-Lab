@@ -103,6 +103,6 @@ saves/
 
 The complete current file map is in [app/README.md](../app/README.md).
 
-The first useful statistical version begins with eight cards after talon, full current-deal public history, trump/caller/dealer and match score. It compares legal moves under explicitly stated initial policies. It does not guarantee optimality. Trump advice on six cards, partial-history starts, accounts, online multiplayer, voice, photographs and learned opponent models are later features.
+The first useful statistical version begins with eight cards after talon, full current-deal public history, trump/caller/dealer and match score. It compares legal moves under explicitly stated initial policies. It does not guarantee optimality. A separate [six-card calling baseline](TRUMP_CALLING.md) now ranks suits with explained heuristic scores and enforces one-round calling. Statistical trump advice, partial-history starts, accounts, online multiplayer, voice, photographs and learned opponent models remain later features.
 
 Research directions: Cowling, Powley and Whitehouse, [Information Set Monte Carlo Tree Search](https://eprints.whiterose.ac.uk/id/eprint/75048/), 2012; Lanctot et al., [Monte Carlo Sampling for Regret Minimization in Extensive Games](https://papers.nips.cc/paper_files/paper/2009/hash/00411460f7c92d2124a67ea0f4cb5f85-Abstract.html), 2009. These guide experiments; they do not establish the quality of this Bela implementation.

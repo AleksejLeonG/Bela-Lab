@@ -135,6 +135,6 @@ call `resolve_declarations` on synthetic hands to manufacture missing public
 records. Observation tests check invariance when other unrevealed cards change.
 New simulated policies must receive only their own observation.
 
-Then establish the rollout policy, evaluation objective and uncertainty reporting
-before displaying success percentages. This audit does not certify playing
-strength, exact optimality or match-win estimates.
+The [Monte Carlo advisor](MONTE_CARLO.md) now supplies explicit rollout policies,
+deal objectives and conservative uncertainty reporting. This audit does not
+certify playing strength, exact optimality or match-win estimates.

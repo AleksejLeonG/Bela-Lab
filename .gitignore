@@ -1,9 +1,36 @@
+# Python runtime, environments and build outputs
 __pycache__/
 *.py[cod]
 .venv/
+venv/
 *.egg-info/
 .pytest_cache/
 .coverage
+.coverage.*
+htmlcov/
+.mypy_cache/
+.ruff_cache/
 build/
 dist/
-saves/
+# Local matches, captures, analysis reports and concurrency probes
+/saves/
+
+# Credentials and machine-local configuration (keep shareable templates)
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# JavaScript dependencies and generated test reports
+node_modules/
+coverage/
+playwright-report/
+test-results/
+
+# Local logs, temporary files and operating-system metadata
+*.log
+*.tmp
+*.pyc.*
+.DS_Store
+Thumbs.db
+Desktop.ini
