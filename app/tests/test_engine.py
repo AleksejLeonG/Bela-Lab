@@ -5,13 +5,13 @@ import sys
 import unittest
 from dataclasses import FrozenInstanceError
 
-from bela.advisor import analyze
+from bela.analysis.advisor import analyze
 from bela.domain.cards import Card, Rank, Suit, deck
 from bela.domain.game import Seat, Trick
 from bela.rules.play import card_points, legal_cards, strength, trick_winner
 from bela.rules.scoring import match_winner, settle_deal
 from bela.rules.melds import detect_melds
-from bela.simulation import observe, play_card, resolve_declarations, settle_play, start_play
+from bela.gameplay.simulation import observe, play_card, resolve_declarations, settle_play, start_play
 
 
 def cards(*values):

@@ -6,25 +6,20 @@ Any complete allocation used by the validator is transient, never game data.
 
 from dataclasses import dataclass, replace
 from functools import lru_cache
-from itertools import combinations
-from math import comb
-from time import monotonic
 from uuid import uuid4
 
 from bela.domain.cards import Card, Rank, Suit, deck
 from bela.domain.game import Phase, Seat, Trick
-from bela.domain.melds import BelaAnnouncement, BelotResult, MeldKind
+from bela.domain.melds import BelaAnnouncement, BelotResult
+from bela.analysis.knowledge import EvidenceBuilder, KnowledgeEvidence, Reason
 from bela.rules.melds import detect_melds, has_belot
 from bela.rules.play import card_points, legal_cards, strength, trick_winner, winning_index
 from bela.rules.scoring import DealResult, match_winner, settle_deal
+from bela.analysis.validation import MeldConstraint, ValidationLimit, allocation_exists as _allocation_exists
 
 
 class InconsistentInput(ValueError):
     """No legal game can explain the supplied observations."""
-
-
-class ValidationLimit(ValueError):
-    """Validation ran out of budget; this is not proof of a contradiction."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -110,6 +105,7 @@ class TrackedState:
     awarded_melds: tuple[int, int]
     bela_announcements: tuple[BelaAnnouncement, ...]
     result: DealResult | BelotResult | None
+    evidence: KnowledgeEvidence
 
     @property
     def next_player(self) -> Seat | None:
@@ -145,74 +141,6 @@ def _cards(cards):
         raise ValueError("Reveal 1–8 distinct cards.")
 
 
-def _allocation_exists(domains, checks, *, max_nodes=100_000, seconds=3.0):
-    """Capacity matching plus hand-constraint search; witnesses remain private.
-
-    A budget exhaustion raises distinctly from a proven impossible state.
-    checks maps constrained seats to predicates over an INITIAL eight-card hand.
-    """
-    deadline, nodes = monotonic() + seconds, 0
-
-    def tick():
-        nonlocal nodes
-        nodes += 1
-        if nodes > max_nodes or monotonic() > deadline:
-            raise ValidationLimit("Validation reached its computation limit. The input was not accepted; "
-                                  "this does not prove it is wrong. Add revealed cards or a more specific declaration.")
-
-    def matching(masks):
-        # Expand each seat into eight slots, then find a complete matching.
-        slots = [None] * 32
-
-        def assign(card_id, seen):
-            for seat in range(4):
-                if not masks[card_id] & (1 << seat):
-                    continue
-                for slot in range(seat * 8, seat * 8 + 8):
-                    if slot in seen:
-                        continue
-                    seen.add(slot)
-                    if slots[slot] is None or assign(slots[slot], seen):
-                        slots[slot] = card_id
-                        return True
-            return False
-
-        for card_id in sorted(range(32), key=lambda i: masks[i].bit_count()):
-            if not assign(card_id, set()):
-                return False
-        return True
-
-    all_cards = deck()
-
-    def search(masks, pending):
-        tick()
-        if not matching(masks):
-            return False
-        if not pending:
-            return True
-        options = []
-        for seat in pending:
-            fixed = tuple(i for i, mask in enumerate(masks) if mask == 1 << seat)
-            free = tuple(i for i, mask in enumerate(masks) if mask & (1 << seat) and mask != 1 << seat)
-            need = 8 - len(fixed)
-            if not 0 <= need <= len(free):
-                return False
-            options.append((comb(len(free), need), seat, fixed, free, need))
-        _, seat, fixed, free, need = min(options)
-        for chosen in combinations(free, need):
-            tick()
-            owned = frozenset((*fixed, *chosen))
-            if not checks[seat](frozenset(all_cards[i] for i in owned)):
-                continue
-            narrowed = tuple((1 << seat) if i in owned else mask & ~(1 << seat)
-                             for i, mask in enumerate(masks))
-            if search(narrowed, pending - {seat}):
-                return True
-        return False
-
-    return search(tuple(domains), frozenset(checks))
-
-
 @lru_cache(maxsize=256)
 def replay_deal(setup: DealSetup, events: tuple[Event, ...]) -> TrackedState:
     """Rebuild public state and prove that at least one legal hidden deal exists."""
@@ -221,6 +149,7 @@ def replay_deal(setup: DealSetup, events: tuple[Event, ...]) -> TrackedState:
     domains = [15 & ~(1 << setup.player)] * 32
     for card in setup.hand:
         domains[card.id] = 1 << setup.player
+    evidence = EvidenceBuilder(setup, domains)
     hand, shown, played = set(setup.hand), [set() for _ in Seat], set()
     presence, values, highs = {}, {}, {}
     trick, completed = Trick(setup.dealer.next), []
@@ -229,17 +158,21 @@ def replay_deal(setup: DealSetup, events: tuple[Event, ...]) -> TrackedState:
     phase, result = Phase.DECLARATIONS, None
     winner_key = winner_priority = None
 
-    def force(card, player):
+    def force(card, player, reason=None):
         if not domains[card.id] & (1 << player):
-            raise InconsistentInput(f"Karta {card} cannot belong to player {int(player)} given the recorded history.")
+            raise InconsistentInput(f"Card {card} cannot belong to player {int(player)} given the recorded history.")
         domains[card.id] = 1 << player
+        evidence.force(card, player, reason or Reason("played", int(player), (event_index,)))
 
-    def exclude(player, predicate):
-        for card in deck():
-            if card not in played and predicate(card):
-                domains[card.id] &= ~(1 << player)
-                if not domains[card.id]:
-                    raise InconsistentInput(f"The move contradicts known ownership of card {card}.")
+    def exclude(player, predicate, reason):
+        targets = [card for card in deck() if card not in played and predicate(card)]
+        if targets:
+            evidence.deduce(reason)
+        for card in targets:
+            domains[card.id] &= ~(1 << player)
+            evidence.exclude(card, player, reason)
+            if not domains[card.id]:
+                raise InconsistentInput(f"The move contradicts known ownership of card {card}.")
 
     for event_index, event in enumerate(events):
         try:
@@ -256,28 +189,34 @@ def replay_deal(setup: DealSetup, events: tuple[Event, ...]) -> TrackedState:
                     raise ValueError("Invalid card or bela announcement.")
                 card, player = event.card, event.player
                 if card in played:
-                    raise ValueError(f"Karta {card} has already been played.")
+                    raise ValueError(f"Card {card} has already been played.")
                 force(card, player)
                 if player == setup.player and card not in legal_cards(hand, trick, setup.trump):
-                    raise ValueError(f"Karta {card} is not legal from your hand.")
+                    raise ValueError(f"Card {card} is not legal from your hand.")
                 if trick.cards:
                     led = trick.cards[0].suit
                     winning = trick.cards[winning_index(trick, setup.trump)]
                     if card.suit != led:
-                        exclude(player, lambda c: c.suit == led)
+                        exclude(player, lambda c: c.suit == led,
+                                Reason("void_suit", int(player), (event_index,), led.value))
                         if card.suit != setup.trump:
-                            exclude(player, lambda c: c.suit == setup.trump)
+                            exclude(player, lambda c: c.suit == setup.trump,
+                                    Reason("void_suit", int(player), (event_index,), setup.trump.value))
                     if (card.suit == winning.suit
                             and (card.suit == led or card.suit == setup.trump)
                             and strength(card, setup.trump) <= strength(winning, setup.trump)):
                         exclude(player, lambda c: c.suit == winning.suit
-                                and strength(c, setup.trump) > strength(winning, setup.trump))
+                                and strength(c, setup.trump) > strength(winning, setup.trump),
+                                Reason("no_higher", int(player), (event_index,), winning.suit.value, str(winning)))
                 if event.bela:
                     pair = {Card(setup.trump, Rank.KING), Card(setup.trump, Rank.QUEEN)}
                     if bela or card not in pair or pair & played:
                         raise ValueError("Announce bela only with the first trump K/Q while holding both cards.")
                     for other in pair:
-                        force(other, player)
+                        force(other, player, Reason("bela_pair", int(player), (event_index,),
+                                                   cards=tuple(sorted(map(str, pair)))))
+                    evidence.deduce(Reason("bela_pair", int(player), (event_index,),
+                                           cards=tuple(sorted(map(str, pair)))))
                     bela.append(BelaAnnouncement(player, card, len(completed), len(trick.cards)))
                 played.add(card)
                 remaining[player] -= 1
@@ -313,7 +252,11 @@ def replay_deal(setup: DealSetup, events: tuple[Event, ...]) -> TrackedState:
                 if event.points in (150, 200):
                     rank = Rank.NINE if event.points == 150 else Rank.JACK
                     for suit in Suit:
-                        force(Card(suit, rank), event.player)
+                        force(Card(suit, rank), event.player,
+                              Reason("announced_quad", int(event.player), (event_index,),
+                                     cards=tuple(str(Card(s, rank)) for s in Suit)))
+                    evidence.deduce(Reason("announced_quad", int(event.player), (event_index,),
+                                           cards=tuple(str(Card(s, rank)) for s in Suit)))
             elif isinstance(event, SequenceHigh):
                 if not isinstance(event.rank, Rank) or event.player not in values or event.player in highs:
                     raise ValueError("Enter the meld value first, then its high card once.")
@@ -324,7 +267,7 @@ def replay_deal(setup: DealSetup, events: tuple[Event, ...]) -> TrackedState:
             elif isinstance(event, Reveal):
                 _cards(event.cards)
                 for card in event.cards:
-                    force(card, event.player)
+                    force(card, event.player, Reason("revealed", int(event.player), (event_index,)))
                 shown[event.player].update(event.cards)
             elif isinstance(event, FinishDeclarations):
                 if event.winning_team is not None and (type(event.winning_team) is not int or event.winning_team not in (0, 1)):
@@ -342,6 +285,8 @@ def replay_deal(setup: DealSetup, events: tuple[Event, ...]) -> TrackedState:
                     expected_melds[player] = melds
                     for meld in melds:
                         shown[player].update(meld.cards)
+                        for card in meld.cards:
+                            evidence.force(card, player, Reason("revealed", int(player), (event_index,)))
                     if melds:
                         candidates.append((melds[0].strength_key, -order.index(player)))
                         awarded[player.team] += sum(m.points for m in melds)
@@ -356,7 +301,7 @@ def replay_deal(setup: DealSetup, events: tuple[Event, ...]) -> TrackedState:
                 if not has_belot(known):
                     raise ValueError("Belot requires revealing all eight cards of one suit.")
                 for card in known:
-                    force(card, event.player)
+                    force(card, event.player, Reason("belot", int(event.player), (event_index,)))
                 shown[event.player].update(known)
                 result = BelotResult(event.player, frozenset(known), setup.match_score)
                 phase = Phase.MATCH_FINISHED
@@ -366,31 +311,19 @@ def replay_deal(setup: DealSetup, events: tuple[Event, ...]) -> TrackedState:
             raise InconsistentInput(f"Event {event_index + 1}: {error}") from error
 
     def check_for(player):
-        def check(candidate):
-            melds = detect_melds(candidate)
-            if player in presence and bool(melds) != presence[player]:
-                return False
-            if player in values and (not melds or melds[0].points != values[player]):
-                return False
-            if player in highs and (not melds or melds[0].kind != MeldKind.SEQUENCE
-                                    or melds[0].high_rank != highs[player]):
-                return False
-            if expected_melds is not None:
-                if has_belot(candidate):
-                    return False
-                if player in expected_melds:
-                    # Order-independent, exact maximal melds; no hidden extra winner meld.
-                    signature = lambda ms: {(m.kind, frozenset(m.cards)) for m in ms}
-                    if signature(melds) != signature(expected_melds[player]):
-                        return False
-                elif melds:
-                    if winner_key is None:
-                        return False
-                    priority = -((int(player) - int(setup.dealer) - 1) % 4)
-                    if (melds[0].strength_key, priority) > (winner_key, winner_priority):
-                        return False
-            return True
-        return check
+        exact = None
+        if expected_melds is not None and player in expected_melds:
+            exact = tuple(sorted((meld.kind.value, sum(1 << card.id for card in meld.cards))
+                                 for meld in expected_melds[player]))
+        losing = expected_melds is not None and player not in expected_melds
+        priority = -((int(player) - int(setup.dealer) - 1) % 4)
+        return MeldConstraint(
+            presence=presence.get(player), points=values.get(player),
+            high=tuple(Rank).index(highs[player]) if player in highs else None,
+            exact=exact, no_belot=expected_melds is not None,
+            no_melds=losing and winner_key is None,
+            ceiling=winner_key if losing else None,
+            strict_ceiling=losing and winner_key is not None and priority > winner_priority)
 
     constrained = set(presence) | set(values) | set(highs)
     if expected_melds is not None:
@@ -401,7 +334,8 @@ def replay_deal(setup: DealSetup, events: tuple[Event, ...]) -> TrackedState:
                                 "and reveals. Check the last event or correct the history.")
     return TrackedState(setup, frozenset(hand), trick, tuple(completed), phase,
                         tuple(frozenset(cards) for cards in shown), tuple(remaining),
-                        tuple(points), tuple(counts), tuple(awarded), tuple(bela), result)
+                        tuple(points), tuple(counts), tuple(awarded), tuple(bela), result,
+                        evidence.freeze(domains, checks))
 
 
 @dataclass(frozen=True, slots=True)

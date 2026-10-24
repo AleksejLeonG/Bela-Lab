@@ -72,7 +72,8 @@ class MeldContest:
     winning_player: Seat | None
     winning_team: int | None
     awarded_points: tuple[int, int]
-    # Mandatory yes/no statements in play order, starting right of dealer.
+    # Actual yes/no records. Full simulator setup supplies all four in play
+    # order; tracked analysis retains only statements entered by the user.
     presence: tuple[tuple[Seat, bool], ...]
     # Only the winning team's ordinary meld cards must become public.
     revealed: tuple[RevealedMelds, ...]
@@ -91,6 +92,29 @@ class SequenceHighAnnouncement:
 
 
 MeldAnnouncement = MeldValueAnnouncement | SequenceHighAnnouncement
+
+
+@dataclass(frozen=True, slots=True)
+class MeldPresenceAnnouncement:
+    player: Seat
+    has_meld: bool
+
+
+@dataclass(frozen=True, slots=True)
+class CardsRevealedAnnouncement:
+    player: Seat
+    cards: tuple[Card, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class MeldsFinishedAnnouncement:
+    winning_team: int | None
+    # Meld cards made public by finishing, e.g. the tracked player's melds.
+    implicit_reveals: tuple[CardsRevealedAnnouncement, ...] = ()
+
+
+RecordedDeclaration = (MeldPresenceAnnouncement | MeldAnnouncement |
+                       CardsRevealedAnnouncement | MeldsFinishedAnnouncement)
 
 
 @dataclass(frozen=True, slots=True)

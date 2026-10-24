@@ -39,7 +39,8 @@ def observe(state: PlayState, player: Seat) -> PlayerObservation:
                              state.caller, state.match_score, state.current_trick,
                              state.completed_tricks, tuple(map(len, state.hands)),
                              state.next_player, state.phase, state.meld_contest,
-                             state.meld_announcements, state.bela_announcements, state.belot)
+                             state.meld_announcements, state.bela_announcements, state.belot,
+                             state.declaration_history)
 
 
 def _declaration_phase(state: PlayState) -> None:

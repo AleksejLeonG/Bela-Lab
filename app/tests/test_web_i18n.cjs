@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
-const web=path.join(__dirname,"../src/bela/web");
+const web=path.join(__dirname,"../src/bela/interfaces/web");
 const elements=new Map();
 const element=id=>{
   if(!elements.has(id)) elements.set(id,{textContent:"",value:"",setAttribute(){}});

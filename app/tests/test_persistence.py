@@ -12,12 +12,12 @@ from unittest.mock import patch
 from bela.domain.cards import Card, Rank, Suit, deck
 from bela.domain.game import Phase, Seat
 from bela.domain.melds import MeldKind
-from bela.persistence import (InvalidSaveError, dumps_match, load_match, loads_match,
+from bela.storage.persistence import (InvalidSaveError, dumps_match, load_match, loads_match,
                               save_match)
 from bela.rules.melds import detect_melds
 from bela.rules.play import legal_cards
-from bela.session import MatchSession
-from bela.simulation import (announce_meld_value, announce_sequence_high, declare_belot,
+from bela.gameplay.session import MatchSession
+from bela.gameplay.simulation import (announce_meld_value, announce_sequence_high, declare_belot,
                              observe, play_card, resolve_declarations, start_play)
 
 
@@ -252,7 +252,7 @@ class FileTests(unittest.TestCase):
             save_match(session, path)
             original = path.read_bytes()
             updated = session.with_current(advance(session.current, 5))
-            with patch("bela.persistence.os.replace", side_effect=OSError("simulated failure")):
+            with patch("bela.storage.persistence.os.replace", side_effect=OSError("simulated failure")):
                 with self.assertRaises(OSError):
                     save_match(updated, path)
             self.assertEqual(path.read_bytes(), original)

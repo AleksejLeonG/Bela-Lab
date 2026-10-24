@@ -5,14 +5,14 @@ import random
 import sys
 from pathlib import Path
 
-from bela.advisor import analyze
+from bela.analysis.advisor import analyze
 from bela.domain.cards import Card, Rank, Suit, deck
 from bela.domain.game import Phase, Seat
 from bela.domain.melds import BelotResult
-from bela.persistence import InvalidSaveError, load_match, save_match
+from bela.storage.persistence import InvalidSaveError, load_match, save_match
 from bela.rules.melds import has_belot
-from bela.session import MatchSession
-from bela.simulation import (declare_belot, observe, play_card, resolve_declarations,
+from bela.gameplay.session import MatchSession
+from bela.gameplay.simulation import (declare_belot, observe, play_card, resolve_declarations,
                              settle_play, start_play)
 
 
@@ -81,11 +81,11 @@ def _run(args) -> None:
 
 def main() -> None:
     if len(sys.argv) > 1 and sys.argv[1] == "dashboard":
-        from bela.dashboard import main as dashboard_main
+        from bela.interfaces.dashboard import main as dashboard_main
         dashboard_main(sys.argv[2:])
         return
     if len(sys.argv) > 1 and sys.argv[1] == "track":
-        from bela.user_cli import main as track_main
+        from bela.interfaces.player_cli import main as track_main
         track_main(sys.argv[2:])
         return
     # Windows terminals and redirected streams may otherwise use a code page

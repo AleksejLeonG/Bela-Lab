@@ -14,8 +14,8 @@ from bela import RULESET_VERSION
 from bela.domain.cards import Card, Rank, Suit
 from bela.domain.game import Phase, PlayState, Seat
 from bela.domain.melds import MeldValueAnnouncement, SequenceHighAnnouncement
-from bela.session import MatchSession, initial_hands
-from bela.simulation import (announce_meld_value, announce_sequence_high, declare_belot,
+from bela.gameplay.session import MatchSession, initial_hands
+from bela.gameplay.simulation import (announce_meld_value, announce_sequence_high, declare_belot,
                              play_card, resolve_declarations, start_play)
 
 
@@ -113,6 +113,8 @@ def _record(state: PlayState) -> dict:
     """Serialize canonical actions, then verify they recreate the exact state."""
     if not isinstance(state, PlayState):
         raise InvalidSaveError("Expected a PlayState")
+    if state.analysis_only or state.declaration_history:
+        raise InvalidSaveError("Tracked analysis simulations are transient. Save the original player match instead.")
     if any(len(trick.cards) != 4 for trick in state.completed_tricks):
         raise InvalidSaveError("Completed tricks must contain four cards")
     if len(state.completed_tricks) > 8 or len(state.current_trick.cards) > 3:

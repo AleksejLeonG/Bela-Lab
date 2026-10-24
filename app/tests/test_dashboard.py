@@ -6,10 +6,10 @@ import threading
 import unittest
 from unittest.mock import patch
 
-from bela.dashboard import Dashboard, StaleRevision, make_server
+from bela.interfaces.dashboard import Dashboard, StaleRevision, make_server
 from bela.paths import EXAMPLES_ROOT
-from bela.persistence import InvalidSaveError
-from bela.user_storage import load_user_match
+from bela.storage.persistence import InvalidSaveError
+from bela.storage.user_storage import load_user_match
 
 
 EXAMPLE = EXAMPLES_ROOT / "player_match.json"
@@ -49,7 +49,7 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual(self.dashboard.match, before)
         path = self.dashboard._path(before.id)
         raw = path.read_bytes()
-        with patch("bela.dashboard.save_user_match", side_effect=OSError("disk unavailable")):
+        with patch("bela.interfaces.dashboard.save_user_match", side_effect=OSError("disk unavailable")):
             with self.assertRaises(OSError):
                 self.mutate("/api/command", command={"type": "add", "event": {
                     "type": "finish_declarations", "winning_team": None}})
@@ -124,13 +124,28 @@ class HttpDashboardTests(unittest.TestCase):
         return self.request("POST", path, json.dumps(payload), {"Content-Type": "application/json"})
 
     def test_static_assets_rules_and_no_directory_traversal(self):
-        for path in ("/", "/app.js", "/i18n.js", "/preferences.js", "/locale.js", "/style.css", "/favicon.svg", "/api/rules"):
+        for path in ("/", "/app.js", "/knowledge.js", "/i18n.js", "/preferences.js", "/locale.js", "/style.css", "/favicon.svg", "/api/rules"):
             with self.subTest(path=path):
                 status, headers, body = self.request("GET", path)
                 self.assertEqual(status, 200)
                 self.assertTrue(body)
                 self.assertIn("frame-ancestors 'none'", headers["Content-Security-Policy"])
         self.assertEqual(self.request("GET", "/../RULES.md")[0], 404)
+
+    def test_knowledge_is_revisioned_read_only_and_contains_no_witness(self):
+        self.assertEqual(self.request("GET", "/api/knowledge")[0], 404)
+        _, _, body = self.post("/api/demo", {"expected_id": None, "expected_revision": 0})
+        match = json.loads(body)["match"]
+        before = self.dashboard._path(match["id"]).read_bytes()
+        status, _, body = self.request("GET", "/api/knowledge")
+        self.assertEqual(status, 200)
+        data = json.loads(body)
+        self.assertEqual(data["match_id"], match["id"])
+        self.assertEqual(data["revision"], match["revision"])
+        self.assertTrue(data["complete"])
+        self.assertNotIn("hands", data)
+        self.assertNotIn(b'"witness"', body)
+        self.assertEqual(self.dashboard._path(match["id"]).read_bytes(), before)
 
     def test_language_changes_errors_and_rules_without_changing_match(self):
         status, _, body = self.request("GET", "/api/export")
@@ -165,5 +180,6 @@ class HttpDashboardTests(unittest.TestCase):
         for headers in ({"Host": "external.example"}, {"Origin": "https://external.example"}):
             self.assertEqual(self.request("GET", "/api/state", headers=headers)[0], 403)
         self.assertEqual(self.request("POST", "/api/new", "{}", {"Content-Type": "text/plain"})[0], 415)
+        self.assertEqual(self.request("POST", "/api/new", "not JSON", {"Content-Type": "text/plain"})[0], 415)
         self.assertEqual(self.request("POST", "/api/new", "not JSON", {"Content-Type": "application/json"})[0], 422)
         self.assertEqual(self.request("GET", "/api/export")[0], 404)

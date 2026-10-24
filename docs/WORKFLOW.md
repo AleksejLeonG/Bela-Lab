@@ -8,6 +8,8 @@ Implemented: rule library, complete simulator, melds/bela/belot, scoring, versio
 
 Statistical sampling and ranking are not implemented. The early visual dashboard makes the engine easier to test; its existence does not mean the statistical phases below are complete.
 
+Validation performance has been improved with early meld/capacity pruning and rechecked private witness reuse. [VALIDATION.md](VALIDATION.md) records the method, benchmarks and independent correctness checks; the original computation budget is unchanged.
+
 ## Milestones
 
 | Step | Build | Demonstration and acceptance |

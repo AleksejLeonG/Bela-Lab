@@ -92,8 +92,10 @@ function switchView(view) {
     else node.removeAttribute("aria-current");
   });
   const titles = {table:[t("Game table"),t("Track the game. Check moves. Develop strategy.")],history:[t("Event history"),t("Every move and correction, in one place.")],saved:[t("My matches"),t("Save your progress and return when you like.")],help:[t("Rules and help"),t("Agreed rules and a clear way to play.")]};
+  titles.knowledge=[t("What we know"),t("Every conclusion has a reason.")];
   $("page-title").textContent = titles[view][0];
   $("page-subtitle").textContent = titles[view][1];
+  if(view==="knowledge")loadKnowledge();
 }
 function switchTab(tab) {
   currentTab = tab;
@@ -116,6 +118,7 @@ function render() {
   $("export").disabled = !m;
   $("insert-first").disabled = !m;
   renderBoard(); renderHand(); renderPlay(); renderMeldFields(); renderHistory(); renderLibrary();
+  syncKnowledge();
   const recent = m?.events.slice(-3).reverse() ?? [];
   $("recent-events").innerHTML = recent.length ? recent.map(e => l`<div class="recent-row"><span class="event-number">${e.index+1}</span><span>${escapeHtml(friendlyEvent(e.event))}</span></div>`).join("") : t('<div class="recent-empty">Your game is waiting for its first event.</div>');
   $("undo").disabled = !m?.events.length;
@@ -329,6 +332,7 @@ $("import-file").addEventListener("change",action(async()=>{
 $("open-rules").addEventListener("click",action(async()=>{
   const rules=await request("/api/rules?lang="+language);$("rules-content").textContent=rules.text;$("rules-dialog").showModal();
 }));
+initKnowledge();
 (async()=>{
   try{state=await request("/api/state");render();}
   catch(error){render();showError(t("Cannot connect to the local engine. Check that the dashboard is running and refresh the page. ")+error.message);}

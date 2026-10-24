@@ -10,12 +10,12 @@ if __name__ == "__main__":
     os.chdir(Path(__file__).resolve().parent.parent)
     arguments = sys.argv[1:]
     if arguments and arguments[0] in ("--text", "--tekst"):
-        from bela.user_cli import main
+        from bela.interfaces.player_cli import main
         main(arguments[1:])
     elif arguments and arguments[0] == "--simulator":
-        from bela.cli import main
+        from bela.interfaces.simulator_cli import main
         sys.argv = [sys.argv[0], *arguments[1:]]
         main()
     else:
-        from bela.dashboard import main
+        from bela.interfaces.dashboard import main
         main(arguments)

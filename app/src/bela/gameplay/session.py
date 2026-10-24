@@ -8,7 +8,7 @@ from bela.domain.cards import Card, Suit
 from bela.domain.game import PlayState, Seat
 from bela.domain.melds import BelotResult
 from bela.rules.scoring import match_winner
-from bela.simulation import settle_play, start_play
+from bela.gameplay.simulation import settle_play, start_play
 
 
 def initial_hands(state: PlayState) -> tuple[tuple[Card, ...], ...]:

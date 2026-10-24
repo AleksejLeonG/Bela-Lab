@@ -1,9 +1,9 @@
 import unittest
 
-from bela.localization import translate
+from bela.interfaces.localization import translate
 from bela.domain.game import Seat
-from bela.tracking import FinishDeclarations, Play, Presence
-from bela.user_cli import event_text, parse_event, parse_suit
+from bela.gameplay.tracking import FinishDeclarations, Play, Presence
+from bela.interfaces.player_cli import event_text, parse_event, parse_suit
 from bela.domain.cards import Suit
 
 

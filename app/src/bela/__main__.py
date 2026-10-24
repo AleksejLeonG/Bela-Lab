@@ -1,3 +1,3 @@
-from bela.cli import main
+from bela.interfaces.simulator_cli import main
 
 main()

@@ -5,10 +5,10 @@ from uuid import UUID
 
 from bela import RULESET_VERSION
 from bela.domain.cards import Suit, Rank
-from bela.persistence import (InvalidSaveError, MAX_SAVE_BYTES, _card, _int, _object,
+from bela.storage.persistence import (InvalidSaveError, MAX_SAVE_BYTES, _card, _int, _object,
                               _seat, _unique_object, _invalid_constant,
                               read_archive_text, write_archive_text)
-from bela.tracking import (AddEvent, Belot, DealSetup, DeleteEvent, FinishDeclarations, InsertEvent,
+from bela.gameplay.tracking import (AddEvent, Belot, DealSetup, DeleteEvent, FinishDeclarations, InsertEvent,
                            MeldValue, NextDeal, Play, Presence, ReplaceEvent, ReplaceSetup,
                            Reveal, SequenceHigh, UserMatch, ValidationLimit, materialize)
 

@@ -92,9 +92,9 @@ Zapis sadrži identitet i naziv partije, verziju formata i pravila, početne kar
 
 To je za sada **potpuni zapis simulatora sa sve četiri ruke**, a ne javni izvoz ili zapis buduće aplikacije koja zna samo našu ruku. Učitani zapis ne predaje se izravno savjetniku; i dalje se koristi `observe(state, player)`. Format ima granicu 8 MiB i najviše 1000 dijeljenja. Spremanje nije sinkronizacija između uređaja niti rješavanje istodobnih izmjena iste datoteke.
 
-Primjer spremljene nedovršene partije nalazi se u [examples/simulator_match.json](../examples/simulator_match.json).
+Primjer spremljene nedovršene partije nalazi se u [examples/simulator_match.json](../../examples/simulator_match.json).
 
-Biblioteka izlaže `MatchSession.start(state)`, `session.with_current(new_state)`, `session.next_deal(...)`, `save_match(session, path)` i `load_match(path)`. `session.score` vraća aktualan obračunati rezultat, a `session.winner` pobjednički par ili `None`. Za belot se pobjeda čuva zasebno, bez dodavanja fiktivnih bodova. Funkcije su u modulima `bela.session` i `bela.persistence`.
+Biblioteka izlaže `MatchSession.start(state)`, `session.with_current(new_state)`, `session.next_deal(...)`, `save_match(session, path)` i `load_match(path)`. `session.score` vraća aktualan obračunati rezultat, a `session.winner` pobjednički par ili `None`. Za belot se pobjeda čuva zasebno, bez dodavanja fiktivnih bodova. Funkcije su u modulima `bela.gameplay.session` i `bela.storage.persistence`.
 
 ## Početni dizajn
 

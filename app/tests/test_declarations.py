@@ -1,11 +1,11 @@
 import unittest
 
-from bela.advisor import analyze
+from bela.analysis.advisor import analyze
 from bela.domain.cards import Card, Rank, Suit, deck
 from bela.domain.game import Phase, Seat
 from bela.domain.melds import BelotResult, Meld, MeldKind, SequenceHighAnnouncement
 from bela.rules.melds import compare_melds, detect_melds, has_belot, resolve_meld_contest
-from bela.simulation import (announce_meld_value, announce_sequence_high, declare_belot,
+from bela.gameplay.simulation import (announce_meld_value, announce_sequence_high, declare_belot,
                              observe, play_card, resolve_declarations, settle_play, start_play)
 
 

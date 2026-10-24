@@ -16,12 +16,13 @@ Bela Engine/
 
 The launcher remains one level above the application code. Existing matches are preserved in `saves/dashboard`, including their original names and contents.
 
+Start with the [code map](app/README.md) to find application files, or the
+[documentation index](docs/README.md) to choose a guide.
+
 - [Dashboard guide](docs/DASHBOARD.md)
 - [Agreed rules](docs/RULES.md)
-- [Text interface](docs/USER_GUIDE.md)
-- [Workflow](docs/WORKFLOW.md)
-- [Architecture](docs/FRAMEWORK.md)
-- [Development commands](docs/DEVELOPMENT.md)
+- [Project workflow](docs/WORKFLOW.md)
+- [Development and test commands](docs/DEVELOPMENT.md)
 
 ```powershell
 .\START_BELA.cmd --text

@@ -11,15 +11,15 @@ from dataclasses import replace
 from bela.domain.cards import Card, Rank, Suit, deck
 from bela.domain.game import Phase, Seat
 from bela.domain.melds import BelotResult
-from bela.persistence import InvalidSaveError, loads_match
+from bela.storage.persistence import InvalidSaveError, loads_match
 from bela.rules.play import legal_cards
-from bela.simulation import (observe, play_card, resolve_declarations, settle_play, start_play)
-from bela.tracking import (AddEvent, Belot, DealSetup, DeleteEvent, FinishDeclarations,
+from bela.gameplay.simulation import (observe, play_card, resolve_declarations, settle_play, start_play)
+from bela.gameplay.tracking import (AddEvent, Belot, DealSetup, DeleteEvent, FinishDeclarations,
                            InconsistentInput, InsertEvent, MeldValue, NextDeal, Play,
                            Presence, ReplaceEvent, ReplaceSetup, Reveal, SequenceHigh,
                            UserMatch, ValidationLimit, _allocation_exists)
-from bela.user_cli import parse_event, parse_suit
-from bela.user_storage import (dumps_user_match, load_user_match, loads_user_match,
+from bela.interfaces.player_cli import parse_event, parse_suit
+from bela.storage.user_storage import (dumps_user_match, load_user_match, loads_user_match,
                                save_user_match)
 
 

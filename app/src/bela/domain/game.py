@@ -2,7 +2,8 @@ from dataclasses import dataclass
 from enum import Enum
 
 from bela.domain.cards import Card, Suit
-from bela.domain.melds import BelaAnnouncement, BelotResult, MeldAnnouncement, MeldContest
+from bela.domain.melds import (BelaAnnouncement, BelotResult, MeldAnnouncement,
+                              MeldContest, RecordedDeclaration)
 from bela.domain.players import Seat
 
 
@@ -45,7 +46,8 @@ class Trick:
 class PlayState:
     """Complete simulator state after talon pickup and trump selection.
 
-    Construct through simulation.start_play; do not pass this to a policy.
+    Construct through simulation.start_play or SimulationBridge; do not pass
+    this to a policy.
     Declarations must be resolved (or belot declared) before the first card.
     Bidding and session revisions are not implemented yet.
     """
@@ -62,6 +64,11 @@ class PlayState:
     meld_announcements: tuple[MeldAnnouncement, ...] = ()
     bela_announcements: tuple[BelaAnnouncement, ...] = ()
     belot: BelotResult | None = None
+    # Exact public record when resumed from tracking; never filled from hidden
+    # hands. Legacy full-information simulator setup uses its existing summaries.
+    declaration_history: tuple[RecordedDeclaration, ...] = ()
+    # Synthetic tracked continuations must never become full-state game saves.
+    analysis_only: bool = False
 
     @property
     def finished(self) -> bool:
@@ -94,3 +101,4 @@ class PlayerObservation:
     meld_announcements: tuple[MeldAnnouncement, ...]
     bela_announcements: tuple[BelaAnnouncement, ...]
     belot: BelotResult | None
+    declaration_history: tuple[RecordedDeclaration, ...] = ()

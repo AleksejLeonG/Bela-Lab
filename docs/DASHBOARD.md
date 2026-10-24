@@ -6,7 +6,7 @@ The browser dashboard tests the existing Python engine on your computer. No exte
 
 English is the default. Select **Hrvatski** for Croatian. The **Night mode** button switches to a dark theme and becomes **Day mode**. Both preferences persist in browser local storage and are independent of matches. Switching preserves selected cards and entered form values. Match names, card identifiers and saved event data are not translated.
 
-The interface, dialogs, event descriptions, rules reference and engine validation messages support Croatian. English source strings and the Croatian catalog live in `app/src/bela/web`; `hr.json` is shared by the browser and server. Unknown technical errors retain their original detail.
+The interface, dialogs, event descriptions, rules reference and engine validation messages support Croatian. English source strings and the Croatian catalog live in `app/src/bela/interfaces/web`; `hr.json` is shared by the browser and server. Unknown technical errors retain their original detail.
 
 ## Try a match
 
@@ -24,6 +24,10 @@ Under **Melds**, record only public information: presence, strongest spoken valu
 Under **Record a move**, choose the card actually played by the current actor. On your turn, you can click your hand. Legal highlighting means permitted by the rules; card order is not strategic advice. Check the bela box only for a timely announcement with the first trump K/Q.
 
 Tricks and card points update automatically. Match totals change after settlement, including failure and bonuses. **Next deal** appears after the deal finishes if the match is ongoing; it carries the score forward and advances the dealer.
+
+## What we know
+
+Select **What we know** (◎) for public facts, proven deductions per player and possible owners of unplayed cards outside your hand. Each conclusion links to its source event or starting hand. Revealed cards and deduced owners have separate labels. Suit filters narrow the ownership list; **Refresh knowledge** retries unfinished checks. Corrections rebuild the view automatically. Possibility is not a probability estimate. See [KNOWLEDGE.md](KNOWLEDGE.md) for details.
 
 ## Persistence and corrections
 
@@ -49,6 +53,7 @@ The buildless interface contains no copied game-state authority. Python validate
 | Endpoint | Purpose |
 | --- | --- |
 | `GET /api/state` | Permitted observation and saved matches |
+| `GET /api/knowledge` | Revision-linked facts, deductions and ownership support with reasons |
 | `POST /api/new` | New match with your own hand |
 | `POST /api/demo` | Independent demo copy |
 | `POST /api/command` | Add, replace, insert, delete, setup or next deal |

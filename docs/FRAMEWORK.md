@@ -36,6 +36,13 @@ Later behavioral likelihoods can weight deals according to observed passes or pl
 
 ## First advisor
 
+The [simulation bridge](SIMULATION_BRIDGE.md) constructs resumable simulations
+from the exact tracked revision and a sampled deal, preserving recorded public
+declarations rather than regenerating them from hypothetical hidden hands. Its
+tests check state agreement and observation invariance under changes to
+unrevealed cards. The sampler's exact small-space foundation checks are
+documented in [SAMPLING.md](SAMPLING.md).
+
 For each legal move, simulate the rest of the deal over the same sampled hidden deals. Use paired seeds and common random numbers for fair comparisons. Start with random legal and simple heuristic continuation policies, each receiving only its own observation. Avoid giving simulated actors the full deal. A forced legal move can return immediately.
 
 Report expected settled points and our contract success or defensive success. Keep these separate from the probability of taking the current trick. A future match-continuation model incorporates current score, next dealer and future calling policies; until implemented, do not label deal success as match-win probability.
@@ -82,14 +89,19 @@ START_BELA.cmd
 app/
   run.py
   src/bela/
-    domain/ rules/ web/
-    tracking.py dashboard.py user_storage.py
-    # Later: knowledge/, belief/, policies/, search/
+    domain/ rules/
+    gameplay/            # Tracking, simulation and sessions
+    analysis/            # Knowledge, validation, sampling, bridge and advisor
+    storage/             # Player and simulator archives
+    interfaces/          # Dashboard, web assets and console interfaces
+    paths.py
   tests/
 docs/
 examples/
 saves/
 ```
+
+The complete current file map is in [app/README.md](../app/README.md).
 
 The first useful statistical version begins with eight cards after talon, full current-deal public history, trump/caller/dealer and match score. It compares legal moves under explicitly stated initial policies. It does not guarantee optimality. Trump advice on six cards, partial-history starts, accounts, online multiplayer, voice, photographs and learned opponent models are later features.
 

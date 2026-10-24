@@ -9,10 +9,10 @@ from bela.domain.cards import Card, Rank, Suit
 from bela.domain.game import Phase, Seat
 from bela.domain.melds import BelotResult
 from bela.paths import SAVES_ROOT
-from bela.tracking import (AddEvent, Belot, DealSetup, DeleteEvent, FinishDeclarations, InsertEvent,
+from bela.gameplay.tracking import (AddEvent, Belot, DealSetup, DeleteEvent, FinishDeclarations, InsertEvent,
                            MeldValue, NextDeal, Play, Presence, ReplaceEvent, ReplaceSetup,
                            Reveal, SequenceHigh, UserMatch)
-from bela.user_storage import load_user_match, save_user_match
+from bela.storage.user_storage import load_user_match, save_user_match
 
 
 HELP = """Commands
