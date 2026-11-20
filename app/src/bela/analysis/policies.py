@@ -1,12 +1,15 @@
 """Small explicit rollout policies operating only on a player's observation."""
 
 from dataclasses import dataclass
+from functools import lru_cache
 from random import Random
+from types import MappingProxyType
 
 from bela.domain.cards import Card, Rank, deck
 from bela.domain.game import PlayerObservation, Trick
 from bela.domain.melds import CardsRevealedAnnouncement, MeldsFinishedAnnouncement
 from bela.rules.play import card_points, legal_cards, strength, trick_winner
+from bela.rules.melds import BELA_PAIRS
 
 
 POLICIES = ("random_v1", "simple_v1", "cautious_v1", "counting_v1", "tactical_v1")
@@ -24,7 +27,7 @@ class PolicyMove:
 
 
 def announce_bela(view: PlayerObservation, card: Card) -> bool:
-    pair = {Card(view.trump, Rank.KING), Card(view.trump, Rank.QUEEN)}
+    pair = BELA_PAIRS[view.trump]
     return not view.bela_announcements and card in pair and pair.issubset(view.hand)
 
 
@@ -40,8 +43,19 @@ def choose_move(view: PlayerObservation, rng: Random, policy="simple_v1") -> Pol
     if policy not in POLICIES:
         raise ValueError("Unknown continuation policy.")
     legal = legal_cards(view.hand, view.current_trick, view.trump)
+    return _choose_from_legal(view, rng, policy, legal)
+
+
+def _choose_from_legal(view, rng, policy, legal):
+    """Internal selection from legal cards already computed for this observation."""
+    if policy not in POLICIES:
+        raise ValueError("Unknown continuation policy.")
     if not legal:
         raise ValueError("The acting player has no legal move.")
+    if len(legal) == 1:
+        # Preserve the random stream used by later turns, even without a choice.
+        card = legal[rng.randrange(1)]
+        return PolicyMove(card, announce_bela(view, card))
     choices = legal
     if policy in ("cautious_v1", "counting_v1", "tactical_v1"):
         choices = _informed_choices(view, legal, policy)
@@ -71,30 +85,44 @@ def choose_move(view: PlayerObservation, rng: Random, policy="simple_v1") -> Pol
     return PolicyMove(card, announce_bela(view, card))
 
 
-def _public_context(view):
-    """Only public ownership and voids, never the sampled hidden hands."""
-    played, known = set(), {}
-    voids = [set() for _ in range(4)]
-    for trick in (*view.completed_tricks, view.current_trick):
-        if not trick.cards:
-            continue
-        led = trick.cards[0].suit
-        for index, card in enumerate(trick.cards):
-            played.add(card)
+def _extend_public_context(context, trick, trump):
+    played, known, voids = context
+    if not trick.cards:
+        return context
+    updated = list(voids)
+    led = trick.cards[0].suit
+    for index, card in enumerate(trick.cards):
+        if card.suit != led:
             seat = trick.seat_at(index)
-            if card.suit != led:
-                voids[seat].add(led)
-                if card.suit != view.trump:
-                    voids[seat].add(view.trump)
-    if view.meld_contest:
-        for reveal in view.meld_contest.revealed:
+            updated[seat] = updated[seat] | {led}
+            if card.suit != trump:
+                updated[seat] = updated[seat] | {trump}
+    return played.union(trick.cards), known, tuple(updated)
+
+
+@lru_cache(maxsize=2048)
+def _completed_public_context(trump, completed, contest, declarations):
+    """Immutable, bounded cache keyed only by public information."""
+    if completed:
+        previous = _completed_public_context(trump, completed[:-1], contest, declarations)
+        return _extend_public_context(previous, completed[-1], trump)
+    known = {}
+    if contest:
+        for reveal in contest.revealed:
             known.update((card, reveal.player) for card in reveal.cards)
-    for record in view.declaration_history:
+    for record in declarations:
         records = record.implicit_reveals if isinstance(record, MeldsFinishedAnnouncement) else (record,)
         for reveal in records:
             if isinstance(reveal, CardsRevealedAnnouncement):
                 known.update((card, reveal.player) for card in reveal.cards)
-    return played, known, voids
+    return frozenset(), MappingProxyType(known), (frozenset(),) * 4
+
+
+def _public_context(view):
+    """Reuse completed public history; extend it only with the current trick."""
+    base = _completed_public_context(view.trump, view.completed_tricks,
+                                     view.meld_contest, view.declaration_history)
+    return _extend_public_context(base, view.current_trick, view.trump)
 
 
 def _informed_choices(view, legal, policy):

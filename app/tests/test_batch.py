@@ -20,6 +20,14 @@ def result(index=0, status="complete", win=True):
 
 
 class BatchUnitTests(unittest.TestCase):
+    def test_learning_cost_is_reported_separately_from_evaluation(self):
+        row = result()
+        row.update(completed_trials=128, completed_learning_trials=128, total_completed_trials=256)
+        summary = summarize([row])
+        self.assertEqual(summary['completed_trials'], 128)
+        self.assertEqual(summary['completed_learning_trials'], 128)
+        self.assertEqual(summary['total_completed_trials'], 256)
+
     def test_configuration_rejects_invalid_counts_modes_and_budgets(self):
         for values in ({"mode":"unknown"}, {"matches":0}, {"matches":True}, {"seed":-1},
                        {"start_index":-1}, {"max_deals":0}, {"samples":0}, {"seconds":0},

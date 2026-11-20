@@ -1,5 +1,7 @@
 # Documentation index
 
+Start with [Current project status](PROJECT_STATUS.md): one recommended setup, what has been checked, and what remains uncertain.
+
 The guides are grouped here by what you want to do. English is the current
 source; original Croatian references are in `translations/`.
 

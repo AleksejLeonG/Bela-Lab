@@ -1,15 +1,13 @@
 @echo off
 setlocal
 cd /d "%~dp0"
-if exist "app\.venv\Scripts\python.exe" (
-    "app\.venv\Scripts\python.exe" "app\run.py" %*
-    goto :finished
+if exist "%LOCALAPPDATA%\Programs\Bela Lab\Bela Lab.exe" (
+    start "" "%LOCALAPPDATA%\Programs\Bela Lab\Bela Lab.exe" %*
+    exit /b
 )
-if exist "%USERPROFILE%\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe" (
-    "%USERPROFILE%\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe" "app\run.py" %*
-    goto :finished
+if exist "app\.venv\Scripts\pythonw.exe" (
+    start "" "app\.venv\Scripts\pythonw.exe" "app\desktop.py" %*
+    exit /b
 )
-python "app\run.py" %*
-:finished
-if errorlevel 1 pause
-endlocal
+echo Build and install the desktop app using the instructions in docs/DESKTOP_APP.md.
+pause

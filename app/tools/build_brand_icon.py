@@ -1,0 +1,17 @@
+"""Write Bela Lab's Tref acorn mark, inspired by the Hungarian deck."""
+from pathlib import Path
+
+WEB = Path(__file__).resolve().parents[1] / 'src/bela/interfaces/web'
+
+SVG = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" rx="6" fill="#253044"/>
+  <path d="M17 9c-.5-2.6-2.2-4-4.6-4.5" fill="none" stroke="#eccb7d" stroke-width="1.8" stroke-linecap="round"/>
+  <path d="M9 15h14v2c-.5 5.5-3.6 9.2-8 10.3C10.9 25.6 8.8 21.8 9 17z" fill="#e8ba5d"/>
+  <path d="M8.8 15.5C9 11.2 11.8 8.4 16 8.3c4.3-.1 7 2.4 7.3 5.7z" fill="#dc7562"/>
+  <path d="M7.8 15.5l16.1-2.2.6 4.5-16 2.2z" fill="#7bac8a"/>
+  <path d="M12 21.5c.6 1.3 1.3 2.1 2.4 2.8" fill="none" stroke="#fff0b6" stroke-width="1.2" stroke-linecap="round"/>
+</svg>
+'''
+
+if __name__ == '__main__':
+    (WEB / 'favicon.svg').write_text(SVG, encoding='utf-8')

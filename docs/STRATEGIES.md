@@ -21,8 +21,11 @@ rules and announce a timely bela. Equal heuristic choices use random tie breaks.
 
 Assignments belong to the internal simulator. No policy receives the lineup or
 other players' profile identities; it receives only its own hand and public game
-information. Our future simulated choices use `tactical_v1`, without being told
-which strategies the other three players received. The root card is evaluated
+information. Our future simulated choices now use a bounded information-set
+Monte Carlo tree (`information_set_tree_v1`), without being told which strategies
+the other three players received. New nodes explore legal choices and later
+visits use simulated values. Tactical is retained only as an explicit historical
+self-model option. The root card is evaluated
 across all sampled possibilities, not chosen after seeing an individual lineup.
 
 The UI and analysis response report the model's uniform weights and available

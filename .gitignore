@@ -14,6 +14,8 @@ build/
 dist/
 # Local matches, captures, analysis reports and concurrency probes
 /saves/
+/docs/EARLY_CHAT_HANDOVER.md
+/docs/history/EARLY_CHAT_SOURCE_SUMMARY.md
 
 # Credentials and machine-local configuration (keep shareable templates)
 .env

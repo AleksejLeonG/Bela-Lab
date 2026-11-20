@@ -15,8 +15,11 @@ from uuid import UUID
 from bela.analysis.lineups import StrategyLineup
 from bela.analysis.monte_carlo import MonteCarloConfig, analyze_moves
 from bela.analysis.policies import MIXED_POLICY, choose_move
-from bela.analysis.trump import CALLING_POLICIES, POLICY, advise_trump
-from bela.domain.cards import Card, deck
+from bela.analysis.trump import POLICY, advise_trump
+from bela.analysis.trump_monte_carlo import (LOCAL_CALLING_POLICIES, MONTE_CARLO_CALL_POLICY,
+    TrumpMonteCarloConfig, analyze_trumps)
+from bela.analysis.self_search import SELF_SEARCH
+from bela.domain.cards import Card, Suit, deck
 from bela.domain.game import Seat
 from bela.domain.melds import BelotResult
 from bela.gameplay.calling import CallingObservation, CallingState
@@ -27,6 +30,7 @@ from bela.gameplay.tracking import (AddEvent, DealSetup, FinishDeclarations,
                                     Play, Presence, Reveal, UserMatch)
 from bela.rules.melds import has_belot
 from bela.rules.play import card_points, trick_winner
+from bela.storage.analysis_log import analysis_record
 
 
 MODES = ("fast", "monte-carlo")
@@ -74,16 +78,23 @@ class BatchConfig:
     samples: int = 128
     seconds: float = 8.0
     max_deals: int = 100
+    self_policy: str = SELF_SEARCH
+    calling_samples: int = 128
+    calling_seconds: float = 2.0
+    condition_on_passes: bool = False
 
     def __post_init__(self):
-        if self.mode not in MODES or self.calling_policy not in CALLING_POLICIES:
+        if self.mode not in MODES or self.calling_policy not in LOCAL_CALLING_POLICIES:
             raise ValueError("Unknown batch mode or calling policy.")
         for name, low, high in (("matches", 1, 100_000), ("seed", 0, 2**64-1),
                                 ("start_index", 0, 1_000_000_000), ("max_deals", 1, 1000)):
             value = getattr(self, name)
             if type(value) is not int or not low <= value <= high:
                 raise ValueError(f"{name} must be an integer from {low} to {high}.")
-        MonteCarloConfig(self.samples, self.seconds, self.seed)
+        MonteCarloConfig(self.samples, self.seconds, self.seed, self_policy=self.self_policy)
+        TrumpMonteCarloConfig(self.calling_samples, self.calling_seconds, self.seed, self.condition_on_passes)
+        if self.calling_seconds <= 0:
+            raise ValueError('Calling seconds must be positive.')
         if not isfinite(self.seconds) or self.seconds <= 0:
             raise ValueError("Monte Carlo seconds must be positive.")
 
@@ -102,17 +113,41 @@ def dealt_hands(seed, deal_index):
     return tuple(tuple(cards[seat*6:seat*6+6] + cards[24+seat*2:26+seat*2]) for seat in range(4))
 
 
-def call_deal(hands, dealer, policy=POLICY):
+class CallingCancelled(Exception):
+    pass
+
+
+def call_deal(hands, dealer, policy=POLICY, *, advisor_player=None, calling_config=None,
+              cancelled=None, on_calling=None):
     if (not isinstance(hands, tuple) or len(hands) != 4
             or any(len(hand) != 8 for hand in hands)
             or any(not isinstance(c, Card) for hand in hands for c in hand)
             or len({c for hand in hands for c in hand}) != 32):
         raise ValueError("Expected four disjoint eight-card hands.")
+    if policy not in LOCAL_CALLING_POLICIES:
+        raise ValueError('Unknown calling policy.')
+    if policy == MONTE_CARLO_CALL_POLICY and not isinstance(advisor_player, Seat):
+        raise ValueError('Monte Carlo calling requires the evaluated player seat.')
     calling = CallingState(dealer)
     records = []
     while calling.next_player is not None:
         player = calling.next_player
-        advice = advise_trump(CallingObservation(player, tuple(hands[player][:6]), calling), policy)
+        if policy == MONTE_CARLO_CALL_POLICY and player == advisor_player:
+            view = CallingObservation(player, tuple(hands[player][:6]), calling)
+            result = analyze_trumps(view, calling_config, cancelled=cancelled)
+            if on_calling is not None:
+                on_calling(result)
+            if result['status'] == 'cancelled' or (cancelled is not None and cancelled()):
+                raise CallingCancelled()
+            rec = result['recommendation']
+            suit = None if rec['action']=='pass' else Suit(rec['suit'])
+            records.append({'player':int(player), 'position':len(calling.passes)+1,
+                'trump':rec['suit'], 'forced':calling.forced, 'threshold':None,
+                'policy':MONTE_CARLO_CALL_POLICY, 'analysis':result})
+            calling = calling.pass_turn(player) if suit is None else calling.call_trump(player, suit)
+            continue
+        advice = advise_trump(CallingObservation(player, tuple(hands[player][:6]), calling),
+                              POLICY if policy == MONTE_CARLO_CALL_POLICY else policy)
         records.append({"player": int(player), "position": advice.position,
                         "trump": None if advice.action is None else advice.action.value,
                         "forced": advice.forced, "threshold": advice.threshold,
@@ -145,7 +180,7 @@ class MatchRun:
     session: MatchSession | None
 
 
-def run_match(config, index, *, cancelled=None):
+def run_match(config, index, *, cancelled=None, on_analysis=None):
     """One complete match, or an explicitly incomplete/cancelled result.
 
     In Monte Carlo mode only the evaluated player uses analysis. All other
@@ -164,10 +199,14 @@ def run_match(config, index, *, cancelled=None):
     record = {"match_index": index, "match_seed": seed, "match_id": match_id,
               "mode": config.mode, "player": int(player), "team": player.team,
               "initial_dealer": int(dealer), "profiles": list(lineup.policies),
+              "evaluated_policy": "monte_carlo" if config.mode == "monte-carlo" else "tactical_v1",
+              "self_continuation": config.self_policy if config.mode == "monte-carlo" else "tactical_v1",
               "calling_policy": config.calling_policy, "status": "deal_limit",
               "winner": None, "our_win": None, "score": [0, 0], "deals": [],
               "decisions": 0, "mc_decisions": 0, "forced_decisions": 0,
-              "completed_trials": 0, "analysis_seconds": 0.0}
+              "completed_trials": 0, "analysis_seconds": 0.0,
+              "completed_learning_trials": 0, "total_completed_trials": 0,
+              "decision_estimates": [], "calling_estimates": []}
     session = None
     stop = False
     for deal_index in range(config.max_deals):
@@ -175,7 +214,25 @@ def run_match(config, index, *, cancelled=None):
             record["status"] = "cancelled"
             break
         hands = dealt_hands(seed, deal_index)
-        calling, bids = call_deal(hands, dealer, config.calling_policy)
+        if config.calling_policy == MONTE_CARLO_CALL_POLICY:
+            def preserve_calling(result):
+                entry = {'format':'bela-trump-analysis-record', 'schema_version':1,
+                    'provenance':'original_analysis',
+                    'context':{'match_index':index, 'deal_index':deal_index, 'phase':'calling'},
+                    'input':result['input'], 'advice':result}
+                record['calling_estimates'].append(entry)
+                if on_analysis is not None:
+                    on_analysis(entry)
+            try:
+                calling, bids = call_deal(hands, dealer, config.calling_policy, advisor_player=player,
+                    calling_config=TrumpMonteCarloConfig(config.calling_samples, config.calling_seconds,
+                        derived_seed(seed,'calling',deal_index), config.condition_on_passes),
+                    cancelled=cancelled, on_calling=preserve_calling)
+            except CallingCancelled:
+                record['status'] = 'cancelled'
+                break
+        else:
+            calling, bids = call_deal(hands, dealer, config.calling_policy)
         score = (0, 0) if session is None else session.score
         if session is None:
             session = MatchSession.start(start_play(hands, trump=calling.trump, dealer=dealer,
@@ -199,8 +256,21 @@ def run_match(config, index, *, cancelled=None):
             ply = len(state.completed_tricks)*4 + len(state.current_trick.cards)
             if config.mode == "monte-carlo" and actor == player:
                 advice = analyze_moves(tracked, MonteCarloConfig(config.samples, config.seconds,
-                                       analysis_seed, MIXED_POLICY), cancelled=cancelled)
+                                       analysis_seed, MIXED_POLICY, self_policy=config.self_policy), cancelled=cancelled)
                 record["analysis_seconds"] += advice["elapsed_seconds"]
+                selected = (advice["moves"][0] if advice["status"] == "forced_move" else
+                            min(advice["moves"], key=lambda row: row["rank"]) if advice["completed_samples"] else None)
+                entry = analysis_record(tracked, advice, match_index=index, deal_index=deal_index,
+                                        ply=ply, selected_move=None if selected is None else
+                                        {"card": selected["card"], "bela": selected["bela"]})
+                record["decision_estimates"].append(entry)
+                try:
+                    if on_analysis is not None:
+                        on_analysis(entry)
+                except (OSError, ValueError) as error:
+                    record.update(status="diagnostic_write_error", error=str(error))
+                    stop = True
+                    break
                 if cancelled():
                     record["status"] = "cancelled"
                     stop = True
@@ -212,6 +282,8 @@ def run_match(config, index, *, cancelled=None):
                     choice = min(advice["moves"], key=lambda row:row["rank"])
                     record["mc_decisions"] += 1
                     record["completed_trials"] += advice["completed_samples"]
+                    record["completed_learning_trials"] += advice.get("completed_learning_samples", 0)
+                    record["total_completed_trials"] += advice.get("total_completed_trials", advice["completed_samples"])
                 else:
                     record["status"] = "cancelled" if cancelled() else "analysis_unavailable"
                     stop = True
@@ -262,7 +334,8 @@ class BatchSummary:
         self.statuses[row["status"]] += 1
         if row["status"] == "complete":
             self.wins += int(row["our_win"])
-        for key in ("decisions", "mc_decisions", "completed_trials", "analysis_seconds"):
+        for key in ("decisions", "mc_decisions", "completed_trials", "completed_learning_trials",
+                    "total_completed_trials", "analysis_seconds"):
             self.totals[key] += row.get(key, 0)
         for deal in row["deals"]:
             for bid in deal["calling"]:
@@ -281,7 +354,8 @@ class BatchSummary:
                 "our_wins": self.wins, "our_losses": complete-self.wins,
                 "our_win_rate": self.wins/complete if complete else None,
                 "calling_by_position": {p:dict(v) for p,v in self.positions.items()},
-                **{key:self.totals[key] for key in ("decisions", "mc_decisions", "completed_trials", "analysis_seconds")}}
+                **{key:self.totals[key] for key in ("decisions", "mc_decisions", "completed_trials",
+                    "completed_learning_trials", "total_completed_trials", "analysis_seconds")}}
 
 
 def summarize(records):

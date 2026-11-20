@@ -11,10 +11,13 @@ from time import perf_counter
 from uuid import uuid4
 
 from bela import RULESET_VERSION
-from bela.analysis.trump import CALLING_POLICIES, POLICY
+from bela.analysis.trump import POLICY
+from bela.analysis.trump_monte_carlo import LOCAL_CALLING_POLICIES, MONTE_CARLO_CALL_POLICY
 from bela.gameplay.batch import BatchConfig, BatchSummary, MODES, run_match
 from bela.paths import SAVES_ROOT
 from bela.storage.persistence import save_match
+from bela.storage.analysis_log import append_analysis
+from bela.analysis.self_search import SELF_POLICIES, SELF_SEARCH
 
 
 def parser():
@@ -24,7 +27,12 @@ def parser():
     result.add_argument("--seed", type=int, default=42)
     result.add_argument("--start-index", type=int, default=0,
                         help="Replay a match index or continue a seed schedule in a new result folder")
-    result.add_argument("--calling-policy", choices=CALLING_POLICIES, default=POLICY)
+    result.add_argument("--calling-policy", choices=LOCAL_CALLING_POLICIES, default=POLICY)
+    result.add_argument("--calling-samples", type=int, default=128)
+    result.add_argument("--calling-seconds", type=float, default=2)
+    result.add_argument("--condition-on-passes", action="store_true")
+    result.add_argument("--self-policy", choices=SELF_POLICIES, default=SELF_SEARCH,
+                        help="Future self decisions; tactical_v1 reproduces the historical baseline")
     result.add_argument("--samples", type=int, default=128, help="Monte Carlo trials per decision")
     result.add_argument("--seconds", type=float, default=8, help="Monte Carlo time budget per decision")
     result.add_argument("--max-deals", type=int, default=100, help="Safety limit per match, not a victory rule")
@@ -39,12 +47,16 @@ def main(argv=None):
     args = cli.parse_args(argv)
     try:
         config = BatchConfig(args.mode, args.matches, args.seed, args.start_index,
-                             args.calling_policy, args.samples, args.seconds, args.max_deals)
+                             args.calling_policy, args.samples, args.seconds, args.max_deals, args.self_policy,
+                             args.calling_samples, args.calling_seconds, args.condition_on_passes)
     except ValueError as error:
         cli.error(str(error))
     metadata = {"format": "bela-local-batch", "schema_version": 1,
                 "ruleset_version": RULESET_VERSION, "config": asdict(config),
-                "self_policy": "tactical_v1", "other_profiles": "independent_uniform_fixed_per_match",
+                "self_policy": config.self_policy if config.mode == "monte-carlo" else "tactical_v1",
+                "other_profiles": "independent_uniform_fixed_per_match",
+                "analysis_journal": "analyses.jsonl" if config.mode == "monte-carlo" or config.calling_policy == MONTE_CARLO_CALL_POLICY else None,
+                "calling_advisor_scope": "evaluated_player_only; other seats use position_control_v2" if config.calling_policy == MONTE_CARLO_CALL_POLICY else "all_seats_heuristic",
                 "automatic_learning": False, "paid_api_required": False,
                 "save_games": args.save_games,
                 "advisor_objective": "point_difference", "advisor_scope": "current_deal",
@@ -81,7 +93,8 @@ def main(argv=None):
                     break
                 run = None
                 try:
-                    run = run_match(config, index, cancelled=stopped.is_set)
+                    run = run_match(config, index, cancelled=stopped.is_set,
+                                    on_analysis=lambda entry: append_analysis(output / "analyses.jsonl", entry))
                     row = run.record
                 except KeyboardInterrupt:
                     row = {"match_index": index, "status": "cancelled", "winner": None,

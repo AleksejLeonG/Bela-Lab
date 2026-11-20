@@ -47,10 +47,12 @@ class CardTests(unittest.TestCase):
             self.assertEqual(sum(card_points(card, trump) for card in deck()), 152)
 
     def test_orders_and_values(self):
-        trump = cards("H_7", "H_8", "H_Q", "H_K", "H_10", "H_A", "H_9", "H_J")
-        plain = cards("S_7", "S_8", "S_9", "S_J", "S_Q", "S_K", "S_10", "S_A")
-        self.assertEqual([strength(c, Suit.HEARTS) for c in trump], list(range(8)))
-        self.assertEqual([strength(c, Suit.HEARTS) for c in plain], list(range(8)))
+        for trump_suit in Suit:
+            for suit in Suit:
+                ranks = "7 8 Q K 10 A 9 J" if suit == trump_suit else "7 8 9 J Q K 10 A"
+                ordered = tuple(Card(suit, Rank(rank)) for rank in ranks.split())
+                with self.subTest(trump=trump_suit, suit=suit):
+                    self.assertEqual([strength(card, trump_suit) for card in ordered], list(range(8)))
         self.assertEqual(card_points(Card.parse("H_J"), Suit.HEARTS), 20)
         self.assertEqual(card_points(Card.parse("S_J"), Suit.HEARTS), 2)
 

@@ -68,7 +68,8 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual(data["match"]["trick"]["plays"], [{"player": 0, "card": "H_K"}])
         self.assertEqual(data["match"]["bela_players"], [0])
         other = Dashboard(Path(self.tmp.name), EXAMPLE)
-        loaded = other.mutate("/api/load", {"expected_id": None, "expected_revision": 0, "id": data["match"]["id"]})
+        self.assertEqual(other.snapshot()["match"], data["match"])
+        loaded = other.mutate("/api/load", {"expected_id": other.match.id, "expected_revision": other.match.revision, "id": data["match"]["id"]})
         self.assertEqual(loaded["match"], data["match"])
 
     def test_stale_tab_is_rejected(self):
@@ -126,13 +127,25 @@ class HttpDashboardTests(unittest.TestCase):
         return self.request("POST", path, json.dumps(payload), {"Content-Type": "application/json"})
 
     def test_static_assets_rules_and_no_directory_traversal(self):
-        for path in ("/", "/app.js", "/advice.js", "/knowledge.js", "/i18n.js", "/preferences.js", "/locale.js", "/style.css", "/favicon.svg", "/api/rules"):
+        for path in ("/", "/app.js", "/deck.js", "/cards/hungarian/H_J.svg", "/cards/hungarian/S_Q.svg", "/cards/hungarian/D_A.svg", "/cards/hungarian/C_10.svg", "/cards/hearts.svg", "/cards/leaves.svg", "/cards/bells.svg", "/cards/acorns.svg", "/advice.js", "/predeal.js", "/review.js", "/review_board.js", "/review_analysis.js", "/knowledge.js", "/i18n.js", "/preferences.js", "/locale.js", "/style.css", "/workspace.css", "/favicon.svg", "/api/rules", "/api/project-status"):
             with self.subTest(path=path):
                 status, headers, body = self.request("GET", path)
                 self.assertEqual(status, 200)
                 self.assertTrue(body)
                 self.assertIn("frame-ancestors 'none'", headers["Content-Security-Policy"])
         self.assertEqual(self.request("GET", "/../RULES.md")[0], 404)
+        for path in ("/review_coach.js", "/review_coach_jobs.js"):
+            status, headers, body = self.request("GET", path)
+            self.assertEqual(status, 200)
+            self.assertTrue(headers["Content-Type"].startswith("text/javascript"))
+            self.assertTrue(body)
+        for suit in "HSDC":
+            for rank in ("7", "8", "9", "10", "J", "Q", "K", "A"):
+                status, headers, body = self.request("GET", f"/cards/hungarian/{suit}_{rank}.svg")
+                self.assertEqual(status, 200)
+                self.assertEqual(headers["Content-Type"], "image/svg+xml")
+                self.assertIn(b"<svg", body)
+        self.assertEqual(self.request("GET", "/cards/hungarian/H_2.svg")[0], 404)
 
     def test_knowledge_is_revisioned_read_only_and_contains_no_witness(self):
         self.assertEqual(self.request("GET", "/api/knowledge")[0], 404)

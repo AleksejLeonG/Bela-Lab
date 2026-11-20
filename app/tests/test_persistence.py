@@ -13,7 +13,7 @@ from bela.domain.cards import Card, Rank, Suit, deck
 from bela.domain.game import Phase, Seat
 from bela.domain.melds import MeldKind
 from bela.storage.persistence import (InvalidSaveError, dumps_match, load_match, loads_match,
-                              save_match)
+                              save_match, write_archive_text)
 from bela.rules.melds import detect_melds
 from bela.rules.play import legal_cards
 from bela.gameplay.session import MatchSession
@@ -234,6 +234,41 @@ class InvalidArchiveTests(unittest.TestCase):
 
 
 class FileTests(unittest.TestCase):
+    def test_transient_windows_lock_retries_atomic_replace(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'match.json'
+            write_archive_text(path,'old')
+            locked=PermissionError('shared file');locked.winerror=32
+            original_replace=os.replace
+            calls=[]
+            def transient(source,target):
+                calls.append((source,target))
+                if len(calls)<3: raise locked
+                return original_replace(source,target)
+            with patch('bela.storage.persistence.os.replace',side_effect=transient), patch('bela.storage.persistence.sleep') as pause:
+                write_archive_text(path,'new')
+            self.assertEqual(path.read_text(),'new')
+            self.assertEqual(len(calls),3)
+            self.assertEqual(pause.call_count,2)
+            self.assertEqual(list(path.parent.iterdir()),[path])
+
+    def test_persistent_windows_denial_remains_bounded_and_preserves_previous_save(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'match.json';write_archive_text(path,'old')
+            denied=PermissionError('denied');denied.winerror=5
+            with patch('bela.storage.persistence.os.replace',side_effect=denied) as replace_file, patch('bela.storage.persistence.sleep') as pause:
+                with self.assertRaises(PermissionError): write_archive_text(path,'new')
+            self.assertEqual(replace_file.call_count,6)
+            self.assertEqual(pause.call_count,5)
+            self.assertEqual(path.read_text(),'old')
+            self.assertEqual(list(path.parent.iterdir()),[path])
+
+    def test_unrelated_permission_error_is_not_retried(self):
+        with tempfile.TemporaryDirectory() as directory:
+            with patch('bela.storage.persistence.os.replace',side_effect=PermissionError('denied')) as replace_file, patch('bela.storage.persistence.sleep') as pause:
+                with self.assertRaises(PermissionError): write_archive_text(Path(directory)/'match.json','new')
+            self.assertEqual(replace_file.call_count,1);pause.assert_not_called()
+
     def test_file_save_load_and_overwrite(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "partije" / "Večernja bela.json"

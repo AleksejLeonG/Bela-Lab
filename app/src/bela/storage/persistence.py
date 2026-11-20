@@ -7,6 +7,7 @@ the future partial-information user-session format or a public game export.
 import json
 import os
 import tempfile
+from time import sleep
 from pathlib import Path
 from uuid import UUID
 
@@ -231,6 +232,23 @@ def save_match(session: MatchSession, path: str | Path) -> Path:
     return write_archive_text(path, dumps_match(session))
 
 
+def _replace_archive(temporary, target):
+    """Give transient Windows sync/indexer locks a short, bounded retry.
+
+    Every attempt remains an atomic replacement. Never remove the old save or
+    alter permissions; unrelated or persistent errors still reach the caller.
+    """
+    delays = (.05, .1, .2, .4, .8)
+    for attempt in range(len(delays)+1):
+        try:
+            os.replace(temporary, target)
+            return
+        except PermissionError as error:
+            if getattr(error, 'winerror', None) not in (5, 32, 33) or attempt == len(delays):
+                raise
+            sleep(delays[attempt])
+
+
 def write_archive_text(path: str | Path, encoded: str) -> Path:
     """Atomic UTF-8 write shared by the separately versioned archive formats."""
     target = Path(path)
@@ -244,7 +262,7 @@ def write_archive_text(path: str | Path, encoded: str) -> Path:
             stream.write(encoded)
             stream.flush()
             os.fsync(stream.fileno())
-        os.replace(temporary, target)
+        _replace_archive(temporary, target)
         temporary = None
     finally:
         if temporary is not None:

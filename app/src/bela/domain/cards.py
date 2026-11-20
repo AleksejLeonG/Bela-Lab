@@ -20,6 +20,12 @@ class Rank(str, Enum):
     ACE = "A"
 
 
+# Card IDs are stable archive values. Build these offsets once, rather than
+# constructing and searching enum tuples on every simulation lookup.
+_SUIT_OFFSETS = {suit: index * 8 for index, suit in enumerate(Suit)}
+_RANK_INDICES = {rank: index for index, rank in enumerate(Rank)}
+
+
 @dataclass(frozen=True, slots=True)
 class Card:
     suit: Suit
@@ -39,7 +45,7 @@ class Card:
 
     @property
     def id(self) -> int:
-        return tuple(Suit).index(self.suit) * 8 + tuple(Rank).index(self.rank)
+        return _SUIT_OFFSETS[self.suit] + _RANK_INDICES[self.rank]
 
     def __str__(self) -> str:
         return f"{self.suit.value}_{self.rank.value}"

@@ -23,7 +23,7 @@ while (walker.nextNode()) {
 document.querySelectorAll("[aria-label]").forEach(node=>staticAttributes.push([node,node.getAttribute("aria-label")]));
 function applyStaticLanguage() {
   document.documentElement.lang=language;
-  document.title=t("Bela — workbench");
+  document.title="Bela Lab";
   for(const [node,source] of staticText) if(node.isConnected) node.textContent=t(source);
   for(const [node,source] of staticAttributes) if(node.isConnected) node.setAttribute("aria-label",t(source));
 }

@@ -1,0 +1,284 @@
+{
+  "format": "bela-player-session",
+  "schema_version": 1,
+  "ruleset_version": "hr-bela-1.0",
+  "id": "ed064529-b76c-c7f3-9e43-7ce7c7bef19d",
+  "name": "Known-card endgame 12",
+  "initial": {
+    "player": 0,
+    "hand": [
+      "H_8",
+      "H_Q",
+      "C_K",
+      "S_8",
+      "S_7",
+      "D_K",
+      "H_9",
+      "C_9"
+    ],
+    "dealer": 3,
+    "caller": 3,
+    "trump": "H",
+    "match_score": [
+      0,
+      0
+    ]
+  },
+  "commands": [
+    {
+      "type": "add",
+      "event": {
+        "type": "reveal",
+        "player": 0,
+        "cards": [
+          "H_8",
+          "H_Q",
+          "C_K",
+          "S_8",
+          "S_7",
+          "D_K",
+          "H_9",
+          "C_9"
+        ]
+      }
+    },
+    {
+      "type": "add",
+      "event": {
+        "type": "reveal",
+        "player": 1,
+        "cards": [
+          "D_Q",
+          "C_8",
+          "C_10",
+          "H_10",
+          "D_9",
+          "H_7",
+          "H_A",
+          "D_8"
+        ]
+      }
+    },
+    {
+      "type": "add",
+      "event": {
+        "type": "reveal",
+        "player": 2,
+        "cards": [
+          "S_Q",
+          "D_7",
+          "C_7",
+          "S_K",
+          "S_10",
+          "C_J",
+          "S_9",
+          "D_J"
+        ]
+      }
+    },
+    {
+      "type": "add",
+      "event": {
+        "type": "reveal",
+        "player": 3,
+        "cards": [
+          "D_A",
+          "S_A",
+          "H_K",
+          "H_J",
+          "C_A",
+          "S_J",
+          "D_10",
+          "C_Q"
+        ]
+      }
+    },
+    {
+      "type": "add",
+      "event": {
+        "type": "finish_declarations",
+        "winning_team": null
+      }
+    },
+    {
+      "type": "add",
+      "event": {
+        "type": "play",
+        "player": 0,
+        "card": "S_7",
+        "bela": false
+      }
+    },
+    {
+      "type": "add",
+      "event": {
+        "type": "play",
+        "player": 1,
+        "card": "H_7",
+        "bela": false
+      }
+    },
+    {
+      "type": "add",
+      "event": {
+        "type": "play",
+        "player": 2,
+        "card": "S_9",
+        "bela": false
+      }
+    },
+    {
+      "type": "add",
+      "event": {
+        "type": "play",
+        "player": 3,
+        "card": "S_A",
+        "bela": false
+      }
+    },
+    {
+      "type": "add",
+      "event": {
+        "type": "play",
+        "player": 1,
+        "card": "D_9",
+        "bela": false
+      }
+    },
+    {
+      "type": "add",
+      "event": {
+        "type": "play",
+        "player": 2,
+        "card": "D_J",
+        "bela": false
+      }
+    },
+    {
+      "type": "add",
+      "event": {
+        "type": "play",
+        "player": 3,
+        "card": "D_10",
+        "bela": false
+      }
+    },
+    {
+      "type": "add",
+      "event": {
+        "type": "play",
+        "player": 0,
+        "card": "D_K",
+        "bela": false
+      }
+    },
+    {
+      "type": "add",
+      "event": {
+        "type": "play",
+        "player": 3,
+        "card": "C_A",
+        "bela": false
+      }
+    },
+    {
+      "type": "add",
+      "event": {
+        "type": "play",
+        "player": 0,
+        "card": "C_9",
+        "bela": false
+      }
+    },
+    {
+      "type": "add",
+      "event": {
+        "type": "play",
+        "player": 1,
+        "card": "C_10",
+        "bela": false
+      }
+    },
+    {
+      "type": "add",
+      "event": {
+        "type": "play",
+        "player": 2,
+        "card": "C_7",
+        "bela": false
+      }
+    },
+    {
+      "type": "add",
+      "event": {
+        "type": "play",
+        "player": 3,
+        "card": "D_A",
+        "bela": false
+      }
+    },
+    {
+      "type": "add",
+      "event": {
+        "type": "play",
+        "player": 0,
+        "card": "H_8",
+        "bela": false
+      }
+    },
+    {
+      "type": "add",
+      "event": {
+        "type": "play",
+        "player": 1,
+        "card": "D_Q",
+        "bela": false
+      }
+    },
+    {
+      "type": "add",
+      "event": {
+        "type": "play",
+        "player": 2,
+        "card": "D_7",
+        "bela": false
+      }
+    },
+    {
+      "type": "add",
+      "event": {
+        "type": "play",
+        "player": 0,
+        "card": "C_K",
+        "bela": false
+      }
+    },
+    {
+      "type": "add",
+      "event": {
+        "type": "play",
+        "player": 1,
+        "card": "C_8",
+        "bela": false
+      }
+    },
+    {
+      "type": "add",
+      "event": {
+        "type": "play",
+        "player": 2,
+        "card": "C_J",
+        "bela": false
+      }
+    },
+    {
+      "type": "add",
+      "event": {
+        "type": "play",
+        "player": 3,
+        "card": "C_Q",
+        "bela": false
+      }
+    }
+  ]
+}

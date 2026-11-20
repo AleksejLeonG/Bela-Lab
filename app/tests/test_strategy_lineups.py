@@ -83,14 +83,14 @@ class StrategyLineupTests(unittest.TestCase):
         before = dumps_user_match(match)
         calls = []
         original = choose_move
-        def record(observation, rng, policy):
+        def record(observation, rng, policy, legal):
             self.assertIsInstance(observation, PlayerObservation)
             self.assertFalse(hasattr(observation, "lineup"))
             self.assertFalse(hasattr(observation, "policies"))
             calls.append((observation.player, policy))
             return original(observation, rng, policy)
-        with patch("bela.analysis.monte_carlo.choose_move", side_effect=record):
-            result = analyze_moves(match, MonteCarloConfig(samples=8, seconds=30, seed=9))
+        with patch("bela.analysis.monte_carlo._choose_from_legal", side_effect=record):
+            result = analyze_moves(match, MonteCarloConfig(samples=8, seconds=30, seed=9, self_policy="tactical_v1"))
         self.assertEqual(result["config"]["policy"], MIXED_POLICY)
         self.assertEqual(result["completed_samples"], 8)
         self.assertEqual(len(calls), 8 * 2 * 7)

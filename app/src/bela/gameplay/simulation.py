@@ -1,13 +1,13 @@
 """Simulator from talon pickup through declarations and the final result."""
 
 from collections.abc import Iterable
-from dataclasses import replace
+from dataclasses import dataclass, replace
 
 from bela.domain.cards import Card, Rank, Suit, deck
 from bela.domain.game import Phase, PlayerObservation, PlayState, Seat, Trick
 from bela.domain.melds import (BelaAnnouncement, BelotResult, MeldKind,
                               MeldValueAnnouncement, SequenceHighAnnouncement)
-from bela.rules.melds import detect_melds, has_belot, resolve_meld_contest
+from bela.rules.melds import BELA_PAIRS, detect_melds, has_belot, resolve_meld_contest
 from bela.rules.play import card_points, legal_cards, trick_winner
 from bela.rules.scoring import DealResult, settle_deal
 
@@ -41,6 +41,28 @@ def observe(state: PlayState, player: Seat) -> PlayerObservation:
                              state.next_player, state.phase, state.meld_contest,
                              state.meld_announcements, state.bela_announcements, state.belot,
                              state.declaration_history)
+
+
+@dataclass(frozen=True, slots=True)
+class _PreparedTurn:
+    state: PlayState
+    view: PlayerObservation
+    legal: tuple[Card, ...]
+
+
+def _prepare_turn(state: PlayState) -> _PreparedTurn:
+    if state.phase != Phase.PLAYING:
+        raise ValueError("Prepare a turn only during play")
+    player = state.next_player
+    return _PreparedTurn(state, observe(state, player),
+                         legal_cards(state.hands[player], state.current_trick, state.trump))
+
+
+def _play_prepared(state: PlayState, turn: _PreparedTurn, card: Card, *,
+                   announce_bela: bool = False) -> PlayState:
+    if not isinstance(turn, _PreparedTurn) or turn.state is not state:
+        raise ValueError("Prepared legal cards belong to a different state")
+    return _play_card(state, turn.view.player, card, announce_bela=announce_bela, _legal=turn.legal)
 
 
 def _declaration_phase(state: PlayState) -> None:
@@ -108,6 +130,11 @@ def declare_belot(state: PlayState, player: Seat) -> PlayState:
 
 def play_card(state: PlayState, player: Seat, card: Card, *,
               announce_bela: bool = False) -> PlayState:
+    return _play_card(state, player, card, announce_bela=announce_bela)
+
+
+def _play_card(state: PlayState, player: Seat, card: Card, *,
+               announce_bela: bool = False, _legal=None) -> PlayState:
     if not isinstance(player, Seat):
         raise ValueError("Expected a Seat")
     if state.phase != Phase.PLAYING:
@@ -116,11 +143,12 @@ def play_card(state: PlayState, player: Seat, card: Card, *,
         raise ValueError("Bela announcement must be a boolean")
     if player != state.next_player:
         raise ValueError("Player is out of turn")
-    if card not in legal_cards(state.hands[player], state.current_trick, state.trump):
+    legal = legal_cards(state.hands[player], state.current_trick, state.trump) if _legal is None else _legal
+    if card not in legal:
         raise ValueError(f"Illegal card: {card}")
     bela = state.bela_announcements
     if announce_bela:
-        pair = frozenset((Card(state.trump, Rank.KING), Card(state.trump, Rank.QUEEN)))
+        pair = BELA_PAIRS[state.trump]
         if card not in pair or not pair.issubset(state.hands[player]):
             raise ValueError("Announce bela on the first trump K/Q while holding both")
         if bela:
@@ -133,10 +161,19 @@ def play_card(state: PlayState, player: Seat, card: Card, *,
     if len(trick.cards) == 4:
         winner = trick_winner(trick, state.trump)
         completed = state.completed_tricks + (trick,)
-        return replace(state, hands=tuple(hands), current_trick=Trick(winner),
-                       completed_tricks=completed, bela_announcements=bela,
-                       phase=Phase.DEAL_FINISHED if len(completed) == 8 else Phase.PLAYING)
-    return replace(state, hands=tuple(hands), current_trick=trick, bela_announcements=bela)
+        trick = Trick(winner)
+        phase = Phase.DEAL_FINISHED if len(completed) == 8 else Phase.PLAYING
+    else:
+        completed, phase = state.completed_tricks, state.phase
+    if _legal is None:
+        return replace(state, hands=tuple(hands), current_trick=trick,
+                       completed_tricks=completed, bela_announcements=bela, phase=phase)
+    # The prepared internal path avoids replace()'s temporary field dictionary.
+    # Keep the validated public path above as the general reference operation.
+    return PlayState(tuple(hands), state.trump, state.dealer, state.caller,
+                     state.match_score, trick, completed, phase, state.meld_contest,
+                     state.meld_announcements, bela, state.belot,
+                     state.declaration_history, state.analysis_only)
 
 
 def settle_play(state: PlayState) -> DealResult | BelotResult:

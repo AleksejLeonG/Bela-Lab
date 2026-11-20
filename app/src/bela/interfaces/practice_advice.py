@@ -44,7 +44,7 @@ def inspect_snapshot(data):
             "trick_points": list(state.trick_points), "trick_counts": list(state.trick_counts)}
 
 
-def evaluate_snapshot(data, config=None):
+def evaluate_snapshot(data, config=None, *, on_analysis=None):
     match = restore_snapshot(data)
     visible = data["visible_hand"]
     if not isinstance(visible, list) or len(visible) > 8:
@@ -57,6 +57,8 @@ def evaluate_snapshot(data, config=None):
     if data["visible_trick"] != expected:
         raise ValueError("Visible trick disagrees with recorded history; stop and resynchronize.")
     result = analyze_moves(match, config)
+    if on_analysis is not None:
+        on_analysis(match, result)
     rows = result["moves"]
     if result["status"] == "forced_move":
         choice = rows[0]
@@ -110,8 +112,15 @@ def main(argv=None):
         data = json.loads(args.snapshot.read_text(encoding="utf-8"))
         if args.forced_visible and args.inspect:
             raise ValueError("Choose either inspection or visible-only forced advice.")
+        diagnostic_paths = []
+        def preserve(match, advice):
+            from bela.storage.analysis_log import save_analysis
+            diagnostic_paths.append(save_analysis(match, advice, source="online_practice"))
         result = (inspect_snapshot(data) if args.inspect else forced_visible_move(data) if args.forced_visible else
-                  evaluate_snapshot(data, MonteCarloConfig(args.samples, args.seconds, args.seed)))
+                  evaluate_snapshot(data, MonteCarloConfig(args.samples, args.seconds, args.seed),
+                                    on_analysis=preserve))
+        if diagnostic_paths:
+            result["analysis_log"] = str(diagnostic_paths[-1])
         if args.output:
             args.output.write_text(json.dumps(result, allow_nan=False, indent=2) + "\n", encoding="utf-8")
         summary = {k: v for k, v in result.items() if k != "analysis"}

@@ -3,7 +3,9 @@
 import argparse
 import json
 
-from bela.analysis.trump import CALLING_POLICIES, POLICY, advise_trump
+from bela.analysis.trump import POLICY, advise_trump
+from bela.analysis.trump_monte_carlo import (LOCAL_CALLING_POLICIES, MONTE_CARLO_CALL_POLICY,
+    TrumpMonteCarloConfig, analyze_trumps)
 from bela.domain.cards import Card
 from bela.domain.players import Seat
 from bela.gameplay.calling import CallingObservation, CallingState
@@ -15,7 +17,12 @@ def main(argv=None):
     parser.add_argument("--dealer", type=int, choices=range(4), default=3)
     parser.add_argument("--player", type=int, choices=range(4), default=0)
     parser.add_argument("--json", action="store_true", help="Machine-readable output")
-    parser.add_argument("--policy", choices=CALLING_POLICIES, default=POLICY)
+    parser.add_argument("--policy", choices=LOCAL_CALLING_POLICIES, default=POLICY)
+    parser.add_argument("--samples", type=int, default=128)
+    parser.add_argument("--seconds", type=float, default=8)
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--condition-on-passes", action="store_true",
+                        help="Assume earlier passers used position_control_v2; otherwise passes give no card deductions")
     args = parser.parse_args(argv)
     try:
         state = CallingState(Seat(args.dealer))
@@ -24,7 +31,25 @@ def main(argv=None):
         # seats passed. It does not infer actual online events.
         while state.next_player != player:
             state = state.pass_turn(state.next_player)
-        advice = advise_trump(CallingObservation(player, tuple(Card.parse(c) for c in args.cards), state), args.policy)
+        view = CallingObservation(player, tuple(Card.parse(c) for c in args.cards), state)
+        if args.policy == MONTE_CARLO_CALL_POLICY:
+            data = analyze_trumps(view, TrumpMonteCarloConfig(args.samples, args.seconds, args.seed,
+                                                            args.condition_on_passes))
+            data['score_kind'] = 'monte_carlo_estimate'
+            data['assumed_prior_passes'] = [int(s) for s in state.passes]
+            if args.json:
+                print(json.dumps(data, allow_nan=False))
+            else:
+                print(f"Experimental Monte Carlo trump advice: {data['status']}, {data['completed_samples']} paired trials")
+                rec = data['recommendation']
+                print('Recommendation:', rec['action'].upper(), rec['suit'] or '', f"({data['recommendation_source']})")
+                print('Earlier pass inference:', data['model']['past_pass_inference'])
+                for row in data['rankings']:
+                    value, success = row['expected_point_difference'], row['success_probability']
+                    print(f"  {row['suit'] or 'PASS'}: " + ('no estimate' if value is None else
+                          f"{value:+.2f} net points; team success {success:.1%}"))
+            return
+        advice = advise_trump(view, args.policy)
     except ValueError as error:
         parser.error(str(error))
     data = {

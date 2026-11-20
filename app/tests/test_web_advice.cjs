@@ -5,15 +5,16 @@ const path=require("node:path");
 const vm=require("node:vm");
 
 async function main(){
-  const pending=[],timers=new Map(),elements=new Map();let timerId=0;
+  const pending=[],requests=[],timers=new Map(),elements=new Map();let timerId=0;
   for(const [id,value] of Object.entries({"advice-samples":"64","advice-seed":"42",
     "advice-policy":"mixed_match_v1","advice-objective":"point_difference",
+    "advice-self-policy":"information_set_tree_v1",
     "advice-start":"","advice-cancel":""})){
     elements.set(id,{value,handlers:{},addEventListener(type,fn){this.handlers[type]=fn;}});
   }
   const context=vm.createContext({state:{match:{id:"a",revision:1,deal_number:1,phase:"playing",next_player:0,setup:{player:0}}},
     language:"en",t:value=>value,$:id=>elements.get(id),context:()=>({expected_id:context.state.match.id,expected_revision:context.state.match.revision}),
-    fetch:()=>new Promise(resolve=>pending.push(resolve)),setTimeout:fn=>{timers.set(++timerId,fn);return timerId;},
+    fetch:(url,options)=>new Promise(resolve=>{requests.push({url,options});pending.push(resolve);}),setTimeout:fn=>{timers.set(++timerId,fn);return timerId;},
     clearTimeout:id=>timers.delete(id),request:async()=>context.state,render:()=>{},selectedPlay:null});
   vm.runInContext(fs.readFileSync(path.join(__dirname,"../src/bela/interfaces/web/advice.js"),"utf8"),context);
   vm.runInContext("renderAdvice=()=>{};initAdvice();syncAdvice()",context);
@@ -48,6 +49,23 @@ async function main(){
   assert.equal(vm.runInContext("adviceStarting",context),false);
   assert.equal(vm.runInContext("adviceError",context),"Bad configuration");
   assert.equal(vm.runInContext("adviceJob",context),null);
+  elements.get("advice-self-policy").value="learn_then_evaluate_v2";
+  elements.get("advice-self-policy").handlers.change();
+  const learned=vm.runInContext("startAdvice()",context);
+  assert.equal(JSON.parse(requests.at(-1).options.body).config.self_policy,"learn_then_evaluate_v2");
+  respond(pending.length-1,job("learned",3));await learned;
+  assert.equal(vm.runInContext("adviceJob.id",context),"learned");
+  elements.get("advice-self-policy").value="direct_competent_mix_v1";
+  elements.get("advice-self-policy").handlers.change();
+  const direct=vm.runInContext("startAdvice()",context);
+  assert.equal(JSON.parse(requests.at(-1).options.body).config.self_policy,"direct_competent_mix_v1");
+  respond(pending.length-1,job("direct",3));await direct;
+  assert.equal(vm.runInContext("adviceJob.id",context),"direct");
+  vm.runInContext('resetAdvice()',context);
+  assert.equal(vm.runInContext('adviceIsRecommended()',context),true);
+  assert.equal(vm.runInContext('adviceJob',context),null);
+  const html=fs.readFileSync(path.join(__dirname,"../src/bela/interfaces/web/index.html"),"utf8");
+  assert.match(html,/<details[^>]*id="advice-experimental"[^>]*>/);
   console.log("Advice revision, match switching, cancellation ordering and settings checks passed.");
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});

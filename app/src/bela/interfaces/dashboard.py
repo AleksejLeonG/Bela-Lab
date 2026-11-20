@@ -19,7 +19,12 @@ from bela.storage.persistence import _invalid_constant, _object, _unique_object
 from bela.paths import DOCS_ROOT, EXAMPLES_ROOT, SAVES_ROOT
 from bela.rules.play import card_points, trick_winner
 from bela.gameplay.tracking import UserMatch, ValidationLimit
+from bela.gameplay.bot_game import BotGame
+from bela.storage.persistence import write_archive_text, read_archive_text
 from bela.interfaces.player_cli import event_text
+from bela.interfaces.trump_advice import trump_request
+from bela.interfaces.review import review_view, save_feedback, historical_match, review_variations
+from bela.storage.analysis_log import append_analysis
 from bela.storage.user_storage import (_command, _setup, dumps_user_match, event_data,
                                load_user_match, loads_user_match, save_user_match,
                                setup_data)
@@ -27,6 +32,10 @@ from bela.storage.user_storage import (_command, _setup, dumps_user_match, event
 
 WEB_ROOT = Path(__file__).with_name("web")
 MAX_REQUEST_BYTES = 16 * 1024 * 1024
+CARD_ASSETS = {f"/cards/{suit}.svg" for suit in ("hearts", "leaves", "bells", "acorns")} | {
+    f"/cards/hungarian/{suit}_{rank}.svg" for suit in "HSDC"
+    for rank in ("7", "8", "9", "10", "J", "Q", "K", "A")}
+
 
 
 class StaleRevision(ValueError):
@@ -67,6 +76,9 @@ def match_view(match):
             "awarded_melds": state.awarded_melds,
             "revealed": [[str(c) for c in sorted(cs, key=lambda c: c.id)] for cs in state.revealed],
             "bela_players": [int(call.player) for call in state.bela_announcements],
+            "deal_scores": [{"number":i+1,"trump":deal.setup.trump.value,"caller":int(deal.setup.caller),
+                "recorded":getattr(deal.state.result,"recorded",None),"score":deal.state.score}
+                for i,deal in enumerate(match.deals) if deal.state.result is not None],
             "result": result,
             "events": [{"index": i, "text": event_text(event), "event": event_data(event)}
                        for i, event in enumerate(match.deals[-1].events)],
@@ -81,7 +93,103 @@ class Dashboard:
         self.storage, self.example = Path(storage), Path(example)
         self.match = None
         self.lock = threading.RLock()
-        self.analysis = AnalysisJobs()
+        self.trump_lock = threading.Lock()
+        self.analysis = AnalysisJobs(self.storage / "analysis")
+        self.review_analysis = AnalysisJobs(self.storage / "analysis")
+        self.review_sources = {}
+        self.mode = "manual"
+        self.manual_match = None
+        self.bot_game = None
+        active = self.storage / "active.json"
+        if active.exists():
+            try:
+                data = json.loads(read_archive_text(active))
+                if data.get("manual_id"):
+                    self.manual_match = load_user_match(self._path(data["manual_id"]))
+                if data.get("bot_id"):
+                    self.bot_game = BotGame.loads(read_archive_text(self._bot_path(data["bot_id"])))
+                self.mode = "bots" if data.get("mode") == "bots" else "manual"
+                self.match = self.bot_game.tracked if self.mode == "bots" and self.bot_game else self.manual_match
+            except (ValueError, OSError, KeyError, TypeError):
+                self.mode, self.match = "manual", None
+
+    def _bot_path(self, identity):
+        self._path(identity)  # UUID validation before constructing private paths.
+        return self.storage / "bots" / f"{identity}.json"
+
+    def _save_active(self):
+        write_archive_text(self.storage / "active.json", json.dumps({"mode":self.mode,
+            "manual_id":self.manual_match.id if self.manual_match else None,
+            "bot_id":self.bot_game.id if self.bot_game else None}))
+
+    def _commit_bot(self, game):
+        target = self._path(game.id)
+        private = self._bot_path(game.id)
+        active = self.storage / "active.json"
+        backups = {p:read_archive_text(p) if p.exists() else None for p in (target,private,active)}
+        manual = self.match if self.mode == "manual" else self.manual_match
+        try:
+            if game.tracked is not None:
+                save_user_match(game.tracked, target)
+            write_archive_text(private, game.dumps())
+            write_archive_text(active, json.dumps({"mode":"bots", "manual_id":manual.id if manual else None,
+                "bot_id":game.id}))
+        except OSError:
+            for path,previous in backups.items():
+                if previous is not None:
+                    write_archive_text(path, previous)
+                elif path.exists():
+                    path.unlink()
+            raise
+        self.manual_match = manual
+        self.bot_game, self.mode, self.match = game, "bots", game.tracked
+        self.analysis.invalidate()
+        self.review_analysis.invalidate()
+        return self.snapshot()
+
+    def bot_request(self, route, payload):
+        with self.lock:
+            if not isinstance(payload, dict):
+                raise ValueError("Expected a request object.")
+            game = self.bot_game
+            if payload.get("expected_id") != (game.id if game else None) or type(payload.get("expected_revision")) is not int or payload["expected_revision"] != (game.revision if game else 0):
+                raise StaleRevision("The bot game changed. Refresh and try again.")
+            fields = {"expected_id", "expected_revision"}
+            if route == "/api/bot/new":
+                _object(payload, fields | {"name", "profile"}, "bot match")
+                return self._commit_bot(BotGame.new(payload["name"], payload["profile"]))
+            if self.mode != "bots" or game is None:
+                raise ValueError("Open a bot match first.")
+            if route == "/api/bot/call":
+                _object(payload, fields | {"suit"}, "trump call")
+                candidate = game.call(payload["suit"])
+            elif route == "/api/bot/play":
+                _object(payload, fields | {"card"}, "your card")
+                candidate = game.play(payload["card"])
+            elif route == "/api/bot/step":
+                _object(payload, fields, "bot turn")
+                candidate = game.step()
+            elif route == "/api/bot/next":
+                _object(payload, fields, "next deal")
+                candidate = game.next_deal()
+            else:
+                raise ValueError("Unknown bot action.")
+            return self._commit_bot(candidate)
+
+    def change_mode(self, payload):
+        with self.lock:
+            _object(payload, {"expected_id", "expected_revision", "mode"}, "game mode")
+            if payload["expected_id"] != (self.match.id if self.match else None) or type(payload["expected_revision"]) is not int or payload["expected_revision"] != (self.match.revision if self.match else 0):
+                raise StaleRevision("The match changed. Refresh and try again.")
+            if payload["mode"] not in ("manual", "bots"):
+                raise ValueError("Unknown game mode.")
+            if self.mode == "manual":
+                self.manual_match = self.match
+            self.mode = payload["mode"]
+            self.match = self.manual_match if self.mode == "manual" else self.bot_game.tracked if self.bot_game else None
+            self._save_active()
+            self.analysis.invalidate()
+            return self.snapshot()
 
     def _path(self, match_id):
         if not isinstance(match_id, str) or str(UUID(match_id)) != match_id:
@@ -99,17 +207,27 @@ class Dashboard:
                         or not isinstance(data.get("commands"), list)
                         or self._path(data.get("id")).name != path.name):
                     continue
-                result.append({"id": data["id"], "name": data["name"],
+                result.append({"id": data["id"], "name": data["name"], "mode":"bots" if self._bot_path(data["id"]).exists() else "manual",
                                "revision": len(data["commands"]),
                                "deals": 1 + sum(c.get("type") == "next_deal" for c in data["commands"] if isinstance(c, dict)),
                                "modified": path.stat().st_mtime})
             except (OSError, ValueError, TypeError, AttributeError):
                 continue
+        known = {r["id"] for r in result}
+        for path in (self.storage / "bots").glob("*.json"):
+            try:
+                data=json.loads(read_archive_text(path))
+                if data["id"] not in known and self._bot_path(data["id"]) == path:
+                    result.append({"id":data["id"],"name":data["name"],"mode":"bots",
+                        "revision":data["revision"],"deals":1,"modified":path.stat().st_mtime})
+            except (ValueError, OSError, KeyError, TypeError):
+                continue
         return sorted(result, key=lambda item: item["modified"], reverse=True)
 
     def snapshot(self):
         with self.lock:
-            return {"match": match_view(self.match), "saved": self.saved()}
+            return {"match": match_view(self.match), "saved": self.saved(), "mode":self.mode,
+                "bot":self.bot_game.public_view() if self.mode == "bots" and self.bot_game else None}
 
     def mutate(self, route, payload):
         with self.lock:
@@ -130,6 +248,8 @@ class Dashboard:
                 candidate = replace(load_user_match(self.example), id=str(uuid4()), name="Demo match")
             elif route == "/api/load":
                 _object(payload, context | {"id"}, "load")
+                if self._bot_path(payload["id"]).exists():
+                    return self._commit_bot(BotGame.loads(read_archive_text(self._bot_path(payload["id"]))))
                 candidate = load_user_match(self._path(payload["id"]))
                 if candidate.id != payload["id"]:
                     raise ValueError("Archive identity does not match the file.")
@@ -138,6 +258,8 @@ class Dashboard:
                 # Import as a separate copy so an older export cannot overwrite a newer save.
                 candidate = replace(loads_user_match(payload["archive"]), id=str(uuid4()))
             elif route == "/api/command":
+                if self.mode == "bots":
+                    raise ValueError("Bot games are controlled by the table. Use Manual input to edit another match.")
                 _object(payload, context | {"command"}, "event")
                 if self.match is None:
                     raise ValueError("Open or create a match first.")
@@ -147,7 +269,10 @@ class Dashboard:
             # Commit memory only after persistence succeeds.
             save_user_match(candidate, self._path(candidate.id))
             self.match = candidate
+            self.mode, self.manual_match = "manual", candidate
+            self._save_active()
             self.analysis.invalidate()
+            self.review_analysis.invalidate()
             return self.snapshot()
 
     def analysis_request(self, route, payload):
@@ -178,6 +303,95 @@ class Dashboard:
             match = self.match
             source = None if match is None else (match.id, match.revision, len(match.deals))
         return self.analysis.view(job_id, source)
+
+    def _review_match(self, match_id=None):
+        if match_id is None or (self.match is not None and self.match.id == match_id):
+            match = self.match
+        else:
+            match = load_user_match(self._path(match_id))
+            if match.id != match_id:
+                raise ValueError("Archive identity does not match the file.")
+        if match is None:
+            raise ValueError("Open a match first.")
+        return match
+
+    def review(self, match_id=None):
+        with self.lock:
+            match = self._review_match(match_id)
+        return review_view(match, self.storage, _trick_data)
+
+    def review_variations(self, payload):
+        _object(payload, {"expected_id", "expected_revision", "key", "seed"}, "move variations")
+        with self.lock:
+            match = self._review_match(payload["expected_id"])
+            if match.id != payload["expected_id"] or match.revision != payload["expected_revision"]:
+                raise StaleRevision("The match changed. Reload the analysis board.")
+            snapshot = historical_match(match, payload["key"])
+        return review_variations(snapshot, payload["seed"], _trick_data)
+
+    def review_analysis_request(self, route, payload):
+        with self.lock:
+            if not isinstance(payload, dict):
+                raise ValueError("Expected a request object.")
+            match = self._review_match(payload.get("expected_id"))
+            if (payload.get("expected_id") != match.id or type(payload.get("expected_revision")) is not int
+                    or payload["expected_revision"] != match.revision):
+                raise StaleRevision("The match changed. Reload the analysis board.")
+            fields = {"expected_id", "expected_revision"}
+            if route == "/api/review/analysis/start":
+                _object(payload, fields | {"key", "config"}, "historical analysis")
+                if not isinstance(payload["key"], str):
+                    raise ValueError("Invalid position key.")
+                snapshot = historical_match(match, payload["key"])
+                source = (match.id, match.revision, len(match.deals), payload["key"])
+                job_id = self.review_analysis.start(snapshot, interactive_config(payload["config"]), source=source,
+                    journal_context={"source": "dashboard_review", "position_key": payload["key"],
+                                     "parent_revision": match.revision})
+                self.review_sources[job_id] = source
+                while len(self.review_sources) > 8:
+                    self.review_sources.pop(next(iter(self.review_sources)))
+            elif route == "/api/review/analysis/cancel":
+                _object(payload, fields | {"job_id"}, "historical analysis cancellation")
+                job_id = payload["job_id"]
+                self.review_analysis.cancel(job_id)
+            else:
+                raise ValueError("Unknown analysis action.")
+            return self.review_analysis_view(job_id)
+
+    def review_analysis_view(self, job_id):
+        with self.lock:
+            if not isinstance(job_id, str) or job_id not in self.review_sources:
+                raise ValueError("Analysis not found.")
+            saved_source = self.review_sources[job_id]
+            try:
+                match = self._review_match(saved_source[0])
+            except (ValueError, OSError):
+                match = None
+            source = None if match is None else (match.id, match.revision, len(match.deals), saved_source[3])
+            return {**self.review_analysis.view(job_id, source), "position_key": saved_source[3]}
+
+    def feedback(self, payload):
+        with self.lock:
+            _object(payload, {"expected_id", "expected_revision", "key", "version",
+                              "flagged", "alternative", "note"}, "review feedback")
+            match = self._review_match(payload["expected_id"])
+            if (payload["expected_id"] != match.id or type(payload["expected_revision"]) is not int
+                    or payload["expected_revision"] != match.revision):
+                raise StaleRevision("The match changed. Reload the review before saving.")
+            return save_feedback(match, self.storage, payload)
+
+    def trump_advice(self, payload):
+        if not self.trump_lock.acquire(blocking=False):
+            raise AnalysisBusy('Trump analysis is already running. Try again shortly.')
+        try:
+            result = trump_request(payload)
+            record = {'format':'bela-trump-analysis-record', 'schema_version':1,
+                'provenance':'original_analysis', 'record_id':str(uuid4()),
+                'input':result['input'], 'advice':result, 'context':{'source':'dashboard'}}
+            append_analysis(self.storage/'trump-analysis'/f"{record['record_id']}.jsonl", record)
+            return result
+        finally:
+            self.trump_lock.release()
 
 
 def make_server(dashboard: Dashboard, port=8765):
@@ -221,6 +435,16 @@ def make_server(dashboard: Dashboard, port=8765):
             path = urlsplit(self.path).path
             if path == "/api/state":
                 self._json(200, dashboard.snapshot())
+            elif path == "/api/review":
+                try:
+                    self._json(200, dashboard.review(parse_qs(urlsplit(self.path).query).get("match_id", [None])[0]))
+                except (ValueError, OSError) as error:
+                    self._json(422, {"error": str(error)})
+            elif path == "/api/review/analysis":
+                try:
+                    self._json(200, dashboard.review_analysis_view(parse_qs(urlsplit(self.path).query).get("id", [None])[0]))
+                except ValueError as error:
+                    self._json(404, {"error": str(error)})
             elif path == "/api/analysis":
                 try:
                     self._json(200, dashboard.analysis_view(parse_qs(urlsplit(self.path).query).get("id", [None])[0]))
@@ -242,6 +466,11 @@ def make_server(dashboard: Dashboard, port=8765):
                     self._json(200, {"text": (DOCS_ROOT / ("translations/RULES.hr.md" if parse_qs(urlsplit(self.path).query).get("lang") == ["hr"] else "RULES.md")).read_text(encoding="utf-8")})
                 except OSError:
                     self._json(503, {"error": "The rules file is unavailable in this project."})
+            elif path == '/api/project-status':
+                try:
+                    self._json(200, {'text':(DOCS_ROOT/'PROJECT_STATUS.md').read_text(encoding='utf-8')})
+                except OSError:
+                    self._json(503, {'error':'The project status document is unavailable.'})
             elif path == "/api/export":
                 with dashboard.lock:
                     if dashboard.match is None:
@@ -251,11 +480,15 @@ def make_server(dashboard: Dashboard, port=8765):
                     self._headers(200, "application/json; charset=utf-8", len(raw),
                                   extra={"Content-Disposition": f'attachment; filename="{dashboard.match.id}.player.json"'})
                     self.wfile.write(raw)
+            elif path in CARD_ASSETS:
+                raw = (WEB_ROOT / path[1:]).read_bytes()
+                self._headers(200, "image/webp" if path.endswith(".webp") else "image/svg+xml", len(raw))
+                self.wfile.write(raw)
             elif path == "/locale.js":
                 raw = ("const CROATIAN = " + json.dumps(CROATIAN, ensure_ascii=False) + ";").encode("utf-8")
                 self._headers(200, "text/javascript; charset=utf-8", len(raw))
                 self.wfile.write(raw)
-            elif path in ("/", "/app.js", "/advice.js", "/knowledge.js", "/i18n.js", "/preferences.js", "/style.css", "/favicon.svg"):
+            elif path in ("/", "/app.js", "/deck.js", "/advice.js", "/trump.js", "/predeal.js", "/review.js", "/review_analysis.js", "/bot_play.js", "/bot_advice.js", "/live_scores.js", "/review_coach.js", "/review_coach_jobs.js", "/review_board.js", "/review_layout.js", "/knowledge.js", "/i18n.js", "/preferences.js", "/style.css", "/workspace.css", "/desktop.css", "/favicon.svg"):
                 file = WEB_ROOT / ("index.html" if path == "/" else path[1:])
                 raw = file.read_bytes()
                 content_type = {".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml"}[file.suffix]
@@ -282,6 +515,24 @@ def make_server(dashboard: Dashboard, port=8765):
                 payload = json.loads(raw.decode("utf-8"),
                                      object_pairs_hook=_unique_object, parse_constant=_invalid_constant)
                 route = urlsplit(self.path).path
+                if route.startswith("/api/bot/"):
+                    self._json(200, dashboard.bot_request(route, payload))
+                    return
+                if route == "/api/mode":
+                    self._json(200, dashboard.change_mode(payload))
+                    return
+                if route in ("/api/review/analysis/start", "/api/review/analysis/cancel"):
+                    self._json(200, dashboard.review_analysis_request(route, payload))
+                    return
+                if route == "/api/review/variations":
+                    self._json(200, dashboard.review_variations(payload))
+                    return
+                if route == '/api/review/feedback':
+                    self._json(200, dashboard.feedback(payload))
+                    return
+                if route == '/api/trump':
+                    self._json(200, dashboard.trump_advice(payload))
+                    return
                 result = dashboard.analysis_request(route, payload) if route in (
                     "/api/analysis/start", "/api/analysis/cancel") else dashboard.mutate(route, payload)
                 self._json(200, result)
@@ -301,7 +552,7 @@ def make_server(dashboard: Dashboard, port=8765):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Local Bela dashboard")
-    parser.add_argument("--port", type=int, default=8765)
+    parser.add_argument("--port", type=int, default=8766)
     parser.add_argument("--no-browser", action="store_true")
     args = parser.parse_args(argv)
     if not 0 <= args.port <= 65535:
@@ -321,4 +572,5 @@ def main(argv=None):
         pass
     finally:
         dashboard.analysis.invalidate()
+        dashboard.review_analysis.invalidate()
         server.server_close()

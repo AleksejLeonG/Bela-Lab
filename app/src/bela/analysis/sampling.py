@@ -198,6 +198,24 @@ class HandSampler:
         weights(0, (8, 8, 8, 8))
         count.cache_clear()
 
+    def enumerate_deals(self, check):
+        """Visit each accepted allocation once, using the sampler's completion table."""
+        hands = [0] * 4
+
+        def visit(index, capacities):
+            check()
+            if index == 32:
+                if all(constraint.accepts(hands[seat]) for seat, constraint in self._checks):
+                    yield SampledDeal(tuple(hands))
+                return
+            bit = 1 << self._order[index]
+            for seat, remaining, _ in self._weights[index, capacities]:
+                hands[seat] |= bit
+                yield from visit(index + 1, remaining)
+                hands[seat] ^= bit
+
+        yield from visit(0, (8, 8, 8, 8))
+
     def sample(self, count, *, seed=None, seconds=1.0, max_attempts=100_000):
         """Draw with replacement; duplicate deals are intentional and valid.
 

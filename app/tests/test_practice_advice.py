@@ -44,8 +44,12 @@ class PracticeAdviceTests(unittest.TestCase):
 
     def test_no_completed_trials_does_not_choose_a_fallback(self):
         _, data = snapshot()
+        captured = []
         with self.assertRaisesRegex(ValueError, "No completed"):
-            evaluate_snapshot(data, MonteCarloConfig(seconds=0))
+            evaluate_snapshot(data, MonteCarloConfig(seconds=0),
+                              on_analysis=lambda match, result: captured.append(result))
+        self.assertEqual(captured[0]["status"], "time_limit")
+        self.assertEqual(captured[0]["completed_samples"], 0)
 
     def test_only_unique_visible_move_is_allowed_after_history_loss(self):
         data = {"player": 0, "hand": ["C_K", "S_10"], "trump": "C", "leader": 3, "trick": ["S_J"]}

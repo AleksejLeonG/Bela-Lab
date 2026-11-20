@@ -1,0 +1,10 @@
+const assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs'),path=require('node:path');
+const ctx=vm.createContext({});vm.runInContext(fs.readFileSync(path.join(__dirname,'../src/bela/interfaces/web/live_scores.js'),'utf8'),ctx);
+ctx.match={completed_tricks:[{winner:1,points:12},{winner:0,points:20}],awarded_melds:[50,0],bela_players:[0],score:[121,41]};
+let data=vm.runInContext('liveScoreData(match)',ctx);assert.equal(data.earned[0],90);assert.equal(data.earned[1],12);
+assert.equal(data.tricks[1].total[0],20);assert.equal(data.total[0],121);
+ctx.match={completed_tricks:Array.from({length:8},(_,i)=>({winner:0,points:i===7?12:20})),awarded_melds:[0,0],bela_players:[],score:[252,0],result:{type:'deal',earned:[252,0],recorded:[252,0]}};
+data=vm.runInContext('liveScoreData(match)',ctx);assert.equal(data.tricks.at(-1).bonus,100);assert.equal(data.tricks.at(-1).total[0],252);
+ctx.match.result={type:'deal',earned:[50,112],recorded:[0,162]};
+data=vm.runInContext('liveScoreData(match)',ctx);assert.equal(data.earned[0],50);assert.equal(data.recorded[0],0);
+console.log('Live scores distinguish running tricks, eligible melds/Bela, last-trick and sweep bonuses, contract settlement and match totals.');

@@ -21,13 +21,18 @@ vm.runInContext(fs.readFileSync(path.join(web,"preferences.js"),"utf8"),context)
 vm.runInContext(fs.readFileSync(path.join(web,"i18n.js"),"utf8"),context);
 assert.equal(context.document.documentElement.lang,"en");
 assert.equal(context.document.documentElement.dataset.theme,"light");
+assert.equal(context.document.documentElement.dataset.cardStyle,"hungarian");
 assert.equal(vm.runInContext('t("Game table")',context),"Game table");
 vm.runInContext('language="hr"',context);
 assert.equal(vm.runInContext('t("Game table")',context),"Stol za igru");
 assert.equal(vm.runInContext('t("No card selected.")',context),"Nijedna karta nije odabrana.");
+assert.equal(vm.runInContext('t("Your future play")',context),"Tvoji budući potezi");
+assert.equal(vm.runInContext('t("learning trials")',context),"simulacija za učenje");
 assert.equal(vm.runInContext('t("Player 2 has no melds")',context),"Igrač 2 nema zvanja");
 assert.equal(vm.runInContext('l`Player ${2} revealed ${"My match"}`',context),"Igrač 2 pokazao My match");
 assert.equal(vm.runInContext('t("phase-badge")',context),"phase-badge");
+assert.equal(vm.runInContext('t("Your game review")',context),"Pregled tvoje partije");
+assert.equal(vm.runInContext('t("Uncertain alternative")',context),"Nesigurna alternativa");
 context.document.documentElement.dataset.theme="dark";
 vm.runInContext('updateThemeButton()',context);
 assert.equal(element("theme-toggle").textContent,"Dnevni način");

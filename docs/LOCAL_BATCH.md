@@ -26,6 +26,17 @@ the public batch command still runs matches sequentially.
 | `fast` | Fixed `tactical_v1` card policy | Independent uniform selection from the five profiles | Check calling behavior, whole-match rules and a baseline cheaply |
 | `monte-carlo` | Current Monte Carlo advisor on every decision | Same fixed-profile model | Evaluate the actual advisor over complete matches |
 
+The current mixed advisor uses information-set search for our future decisions.
+The completed 50-match paired comparison predates this correction and used fixed
+Tactical self continuation. Do not combine the two method versions as one engine
+result. Use `--self-policy tactical_v1` to retain the historical self model for a
+controlled baseline, or the default `information_set_tree_v1` for the corrected
+bounded search. See [advisor diagnostics and limits](MONTE_CARLO.md).
+The information-set self model remains experimental: targeted diagnostics found
+mostly unexplored future decisions even at 2048 trials. Its four-pair smoke test
+passed operational checks but did not establish a playing-strength improvement;
+the next large paired evaluation is deferred until future-search coverage improves.
+
 Each other player's profile is selected once per match and retained across
 deals. The evaluated player's seat rotates through all four positions across
 match indices; the initial dealer rotates across groups of four. Absolute
@@ -86,6 +97,9 @@ measured runtime rather than assumed to be necessary.
 A new folder is created under `saves/batches/` for every actual run:
 
 - `config.json`: modes, policies, rules version, seed and budgets.
+- `analyses.jsonl`: every original Monte Carlo result and replayable player input,
+  flushed before moving. Includes every candidate, intervals, pair comparisons,
+  selected move, seed and method. A write failure stops the match with a checkpoint.
 - `matches.jsonl`: a flushed record per match, with scores, call rankings,
   contract results, fixed strategy profiles and analysis totals.
   Each completed deal includes `tricks`: ordered cards and players, winner,
@@ -112,6 +126,15 @@ winner. `--start-index N` restarts a chosen match index under the same seed
 schedule; it does not resume from a saved mid-match checkpoint.
 
 ## Comparisons and reproducibility
+
+Experimental [Monte Carlo calling](MONTE_CARLO_CALLING.md) is enabled with
+`--calling-policy monte_carlo_call_v1`. Only the evaluated player uses it; the
+other seats retain the position-aware heuristic. Separate `--calling-samples`
+(128) and `--calling-seconds` (2) settings work in either card-play mode. The
+optional `--condition-on-passes` assumes earlier passers used our heuristic.
+Original calling estimates are saved before calls are applied, in
+`calling_estimates` and `analyses.jsonl`, including in fast mode. Consumers must
+recognize `bela-trump-analysis-record` separately from move advice records.
 
 Use the same seed and match indices to compare modes or calling policies.
 Card shuffles and actual profile assignments use separate named seed streams,

@@ -6,9 +6,10 @@ from math import sqrt
 from random import Random
 import unittest
 
-from bela.analysis.monte_carlo import MonteCarloConfig, analyze_moves, confidence_interval
+from bela.analysis.monte_carlo import MonteCarloConfig, analyze_moves, confidence_interval, settled_match_outcome
+from bela.rules.scoring import settle_deal
 from bela.analysis.policies import POLICIES, announce_bela, choose_move
-from bela.domain.cards import Card, Rank, Suit
+from bela.domain.cards import Card, Rank, Suit, deck
 from bela.domain.game import PlayerObservation, Seat
 from bela.rules.play import legal_cards
 from bela.gameplay.simulation import (observe, play_card, resolve_declarations,
@@ -82,6 +83,55 @@ def exact_random_outcomes(state, team):
 
 
 class MonteCarloTests(unittest.TestCase):
+    def test_passing_contract_can_still_lose_match_and_ties_continue(self):
+        deal=settle_deal(card_points=(90,62),trick_counts=(4,4),last_trick_team=1,caller_team=0)
+        self.assertTrue(deal.caller_passed)
+        self.assertEqual(deal.recorded,(90,72))
+        self.assertEqual(settled_match_outcome((950,980),deal.recorded,0),(0,1,0))
+        self.assertEqual(settled_match_outcome((980,950),deal.recorded,0),(1,0,0))
+        self.assertEqual(settled_match_outcome((950,980),deal.recorded,1),(1,0,0))
+        self.assertEqual(settled_match_outcome((980,950),(40,70),0),(0,0,1))
+        self.assertEqual(settled_match_outcome((980,950),(20,10),0),(0,0,1))
+
+    def test_match_objective_and_all_three_probabilities_share_trials(self):
+        match,_=endgame()
+        result=analyze_moves(match,MonteCarloConfig(samples=16,seconds=10,objective="match_outcome",policy="random_v1"))
+        self.assertEqual(result["completed_samples"],16)
+        for row in result["moves"]:
+            win,loss,cont=(row[k] for k in ("our_match_win_probability","opponent_match_win_probability","match_continue_probability"))
+            self.assertAlmostEqual(win+loss+cont,1)
+            self.assertAlmostEqual(row["objective_mean"],win-loss)
+            for key in ("our_match_win_interval","opponent_match_win_interval","match_continue_interval"):
+                self.assertTrue(0<=row[key][0]<=row[key][1]<=1)
+    def test_sweep_odds_and_90_bonus_for_both_teams_and_caller_sides(self):
+        strong=cards("H_J H_9 H_A H_10 H_K H_Q H_8 S_A")
+        rest=[c for c in deck() if c not in strong]
+        hands=(strong,tuple(rest[0::3]),tuple(rest[1::3]),tuple(rest[2::3]))
+        for own in (0,1):
+            for caller in (Seat.ZERO,Seat.ONE):
+                with self.subTest(own=own,caller=caller):
+                    full=resolve_declarations(start_play(hands,trump=Suit.HEARTS,dealer=Seat.THREE,caller=caller))
+                    plays=[]
+                    for lead in strong[:6]:
+                        for index in range(4):
+                            actor=full.next_player
+                            card=lead if index==0 else legal_cards(full.hands[actor],full.current_trick,full.trump)[0]
+                            full=play_card(full,actor,card);plays.append(Play(actor,card))
+                    if own==1:
+                        full=play_card(full,Seat.ZERO,Card.parse("H_8"));plays.append(Play(Seat.ZERO,Card.parse("H_8")))
+                    match=UserMatch.start(DealSetup(Seat(own),hands[own],Seat.THREE,caller,Suit.HEARTS,(0,0)))
+                    for seat in Seat:match=match.perform(AddEvent(Reveal(seat,hands[seat])))
+                    match=match.perform(AddEvent(FinishDeclarations(full.meld_contest.winning_team)))
+                    for move in plays:match=match.perform(AddEvent(move))
+                    result=analyze_moves(match,MonteCarloConfig(samples=8,seconds=10,policy="random_v1"))
+                    self.assertEqual(result["completed_samples"],8)
+                    for row in result["moves"]:
+                        self.assertEqual(row["our_sweep_probability"],1-own)
+                        self.assertEqual(row["opponent_sweep_probability"],own)
+                        self.assertEqual(row["success_probability"],1-own)
+                        self.assertEqual(row["expected_recorded"][0],252+full.meld_contest.awarded_points[0])
+                        self.assertEqual(row["expected_recorded"][1],0)
+
     def test_random_rollouts_agree_with_exact_endgame_distribution(self):
         match, full = endgame()
         self.assertEqual(len(match.state.legal_actions), 2)
@@ -103,6 +153,8 @@ class MonteCarloTests(unittest.TestCase):
             self.assertLessEqual(row["objective_interval"][0], mean)
             self.assertGreaterEqual(row["objective_interval"][1], mean)
             self.assertEqual(row["samples"], 600)
+            self.assertTrue(0<=row["our_sweep_probability"]<=1)
+            self.assertTrue(0<=row["opponent_sweep_probability"]<=1)
         self.assertEqual(before, dumps_user_match(match))
         self.assertEqual(len(result["comparisons"]), 1)
         self.assertNotIn('"hands"', json.dumps(result))
@@ -120,6 +172,11 @@ class MonteCarloTests(unittest.TestCase):
             self.assertAlmostEqual(pair["mean_difference"], rows[pair["first"]]["objective_mean"]
                                    - rows[pair["second"]]["objective_mean"])
         self.assertTrue(all(row["samples"] == 12 for row in rows.values()))
+        self.assertAlmostEqual(sum(row["sample_best_share"] for row in rows.values()),1)
+        for row in rows.values():
+            self.assertTrue(0<=row["sample_best_share"]<=1)
+            self.assertLessEqual(row["sample_best_interval"][0],row["sample_best_share"])
+            self.assertGreaterEqual(row["sample_best_interval"][1],row["sample_best_share"])
 
     def test_contract_objective_and_defensive_success_definition(self):
         for caller in (Seat.ZERO, Seat.ONE):

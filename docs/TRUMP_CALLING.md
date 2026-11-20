@@ -6,6 +6,10 @@ Python standard library: no model API, account, hosting or paid service.
 One supervised [online practice deal](ONLINE_PRACTICE.md) has since been
 completed. The standalone online connector and ten-match run remain unfinished.
 
+Experimental [Monte Carlo calling](MONTE_CARLO_CALLING.md) is now available in
+the dashboard and through `--policy monte_carlo_call_v1`. It evaluates all four
+suits and passing; the heuristic described below remains the default/fallback.
+
 ## Calling rules and information
 
 `gameplay/calling.py` models one calling round. The seat to the dealer's right
@@ -99,9 +103,9 @@ seat 0 is the forced dealer. Seats are 0–3 in play order. The default player i
 pair explicitly assumes that every earlier seat passed; the command prints
 those assumed passes. It does not read an online game or infer that history.
 
-Append `--json` for machine-readable output for a future connector. The normal
-dashboard and existing saved-game formats remain unchanged; pre-calling UI
-and persistence are not integrated yet. Existing move Monte Carlo begins
+Append `--json` for machine-readable output for a future connector. The dashboard
+also has a separate six-card Trump advice tool with original-estimate journals.
+Existing move Monte Carlo begins
 after calling and does not invoke this policy during its current-deal rollouts.
 
 Tests cover calling order for all dealers, early calls, mandatory dealer

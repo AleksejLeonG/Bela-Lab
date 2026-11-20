@@ -10,11 +10,12 @@ TRUMP_ORDER = (Rank.SEVEN, Rank.EIGHT, Rank.QUEEN, Rank.KING,
                Rank.TEN, Rank.ACE, Rank.NINE, Rank.JACK)
 PLAIN_POINTS = dict(zip(PLAIN_ORDER, (0, 0, 0, 2, 3, 4, 10, 11)))
 TRUMP_POINTS = dict(zip(TRUMP_ORDER, (0, 0, 3, 4, 10, 11, 14, 20)))
+_PLAIN_STRENGTH = {rank: index for index, rank in enumerate(PLAIN_ORDER)}
+_TRUMP_STRENGTH = {rank: index for index, rank in enumerate(TRUMP_ORDER)}
 
 
 def strength(card: Card, trump: Suit) -> int:
-    order = TRUMP_ORDER if card.suit == trump else PLAIN_ORDER
-    return order.index(card.rank)
+    return (_TRUMP_STRENGTH if card.suit == trump else _PLAIN_STRENGTH)[card.rank]
 
 
 def card_points(card: Card, trump: Suit) -> int:

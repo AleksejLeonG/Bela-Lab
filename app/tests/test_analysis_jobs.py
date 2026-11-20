@@ -25,10 +25,25 @@ def wait_for(manager, job_id, source):
 
 
 class AnalysisJobsTests(unittest.TestCase):
+    def test_interactive_config_accepts_learning_mode_and_limits_its_budget(self):
+        config = {"samples": 128, "seconds": 8, "seed": 42,
+                  "policy": "mixed_match_v1", "objective": "point_difference",
+                  "self_policy": "learn_then_evaluate_v1", "learning_samples": 64}
+        for mode in ("learn_then_evaluate_v1", "learn_then_evaluate_v2"):
+            parsed = interactive_config(config | {"self_policy": mode})
+            self.assertEqual(parsed.self_policy, mode)
+            self.assertEqual(parsed.learning_samples, 64)
+        with self.assertRaises(ValueError):
+            interactive_config(config | {"learning_samples": 1001})
+
+    def setUp(self):
+        self.journal = tempfile.TemporaryDirectory()
+        self.addCleanup(self.journal.cleanup)
+
     def test_one_worker_cancellation_and_stale_result_suppression(self):
         match = match_with(FinishDeclarations(None))
         source = (match.id, match.revision, 1)
-        manager = AnalysisJobs()
+        manager = AnalysisJobs(Path(self.journal.name))
         entered, release = Event(), Event()
         def blocked(*args, **kwargs):
             entered.set()
@@ -52,7 +67,7 @@ class AnalysisJobsTests(unittest.TestCase):
     def test_retention_is_bounded_and_worker_errors_are_reported(self):
         match = match_with(FinishDeclarations(None))
         source = (match.id, match.revision, 1)
-        manager = AnalysisJobs()
+        manager = AnalysisJobs(Path(self.journal.name))
         ids = []
         with patch("bela.interfaces.analysis_jobs.analyze_moves", return_value={"status": "complete"}):
             for _ in range(10):
@@ -82,6 +97,9 @@ class AnalysisJobsTests(unittest.TestCase):
             self.assertEqual(result["result"]["status"], "forced_move")
             self.assertEqual(result["result"]["strategy_model"]["mode"], "hidden_match_lineups_v1")
             self.assertFalse(result["result"]["strategy_model"]["real_player_profiles_known"])
+            stored = json.loads(Path(result["analysis_log"]).read_text())
+            self.assertEqual(stored["advice"], json.loads(json.dumps(result["result"])))
+            self.assertEqual(stored["context"]["source"], "dashboard")
             self.assertIs(dashboard.match, match)
             self.assertEqual(path.read_bytes(), before)
             self.assertNotIn('"hands"', json.dumps(result))
@@ -90,7 +108,7 @@ class AnalysisJobsTests(unittest.TestCase):
             self.assertEqual(dashboard.analysis_view(job["id"]), result)
 
     def test_invalid_inputs_do_not_launch_workers(self):
-        manager = AnalysisJobs()
+        manager = AnalysisJobs(Path(self.journal.name))
         with self.assertRaises(ValueError):
             manager.start(match_with(), MonteCarloConfig())
         config = {"samples": 128, "seconds": 8, "seed": 42,
@@ -101,3 +119,15 @@ class AnalysisJobsTests(unittest.TestCase):
                 interactive_config(value)
         with self.assertRaises(ValueError):
             manager.cancel("missing")
+
+    def test_failed_diagnostic_write_is_reported_instead_of_silently_discarded(self):
+        match = match_with(FinishDeclarations(None))
+        manager = AnalysisJobs(Path(self.journal.name))
+        source = (match.id, match.revision, 1)
+        with patch("bela.interfaces.analysis_jobs.analyze_moves", return_value={"status":"complete"}), \
+             patch("bela.interfaces.analysis_jobs.save_analysis", side_effect=OSError("disk full")):
+            job = manager.start(match, MonteCarloConfig())
+            result = wait_for(manager, job, source)
+        self.assertEqual(result["state"], "failed")
+        self.assertIsNone(result["result"])
+        self.assertIn("preserve analysis diagnostics", result["error"])

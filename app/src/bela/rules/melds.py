@@ -6,6 +6,10 @@ from bela.domain.melds import (Meld, MeldContest, MeldKind, QUAD_POINTS,
 from bela.domain.players import Seat
 
 
+BELA_PAIRS = {suit: frozenset((Card(suit, Rank.KING), Card(suit, Rank.QUEEN)))
+              for suit in Suit}
+
+
 def _hand(cards: Iterable[Card]) -> frozenset[Card]:
     raw = tuple(cards)
     if (len(raw) > 8 or any(not isinstance(card, Card) for card in raw)
