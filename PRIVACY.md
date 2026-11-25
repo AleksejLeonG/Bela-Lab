@@ -25,6 +25,6 @@ Use **Library → Export** to save a copy of the active match. Before backing up
 
 ## Contact
 
-For a privacy question or request about information shared with the maintainer, use [GitHub Issues](https://github.com/AleksejLeonG/Belote_engine/issues) to request a private contact channel. Include only the minimum information needed on the public issue.
+For a privacy question or request about information shared with the maintainer, use [GitHub Issues](https://github.com/AleksejLeonG/Bela-Lab/issues) to request a private contact channel. Include only the minimum information needed on the public issue.
 
 Depending on the law that applies, you may have the right to access, correct or delete information you shared with the maintainer and to complain to your data protection authority.

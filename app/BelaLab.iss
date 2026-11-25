@@ -5,7 +5,7 @@
 #ifndef ReleaseVersion
   #error ReleaseVersion must match the bundled Bela Lab executable.
 #endif
-#define ProjectUrl "https://github.com/AleksejLeonG/Belote_engine"
+#define ProjectUrl "https://github.com/AleksejLeonG/Bela-Lab"
 
 [Setup]
 AppId={{8D36D51D-21D1-4B0B-83A8-3D60C909A21C}

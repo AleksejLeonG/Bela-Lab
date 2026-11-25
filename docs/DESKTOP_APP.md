@@ -4,7 +4,7 @@ The desktop application uses the existing Python engine with pywebview and Windo
 
 ## Open the app
 
-Download **[Bela Lab 1.0.0 Setup](https://github.com/AleksejLeonG/Belote_engine/releases/download/v1.0.0/Bela-Lab-1.0.0-Windows-x64-Setup.exe)** and run it. Sign in to GitHub with access to this repository to download the installer. The per-user wizard creates a Start menu shortcut and a Windows uninstall entry.
+Download **[Bela Lab 1.0.0 Setup](https://github.com/AleksejLeonG/Bela-Lab/releases/download/v1.0.0/Bela-Lab-1.0.0-Windows-x64-Setup.exe)** and run it. The per-user wizard creates a Start menu shortcut and a Windows uninstall entry.
 
 Use the **Bela Lab** desktop or Start menu shortcut, or `START_BELA.cmd` in the project root. The installed application contains Python and its required libraries. Windows WebView2 must be available (it is present on the development computer).
 
@@ -30,7 +30,7 @@ app/.venv/Scripts/python.exe -m PyInstaller --noconfirm app/BelaLab.spec
 powershell -ExecutionPolicy Bypass -File app/tools/install_desktop.ps1
 ```
 
-The icon is tracked in `app/assets/bela-lab.ico`. The spec bundles the frontend, the project-authored Hungarian SVG deck, the in-app legal documents, the rules and a demo. The build goes to ignored `dist/Bela Lab/`. Close an installed Bela Lab before updating. No administrator account is needed.
+The icon is tracked in `app/assets/bela-lab.ico`. The spec bundles the frontend, the illustrated Hungarian deck and vector card assets, the in-app legal documents, the rules and a demo. The build goes to ignored `dist/Bela Lab/`. Close an installed Bela Lab before updating. No administrator account is needed.
 
 ## Package version 1.0.0
 

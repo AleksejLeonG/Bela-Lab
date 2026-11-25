@@ -22,4 +22,4 @@ If you stop using the app, you can remove the program and separately delete its 
 
 ## Contact
 
-Contact the project maintainer through [GitHub Issues](https://github.com/AleksejLeonG/Belote_engine/issues). Ask for a private contact channel before sharing confidential material. For security reports, use the [security policy](SECURITY.md).
+Contact the project maintainer through [GitHub Issues](https://github.com/AleksejLeonG/Bela-Lab/issues). Ask for a private contact channel before sharing confidential material. For security reports, use the [security policy](SECURITY.md).

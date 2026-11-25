@@ -26,4 +26,4 @@ where = ["src"]
 version = {attr = "bela.__version__"}
 
 [tool.setuptools.package-data]
-"bela.interfaces" = ["web/*.html", "web/*.css", "web/*.js", "web/*.svg", "web/*.json", "web/cards/*.svg", "web/cards/hungarian/*.svg"]
+"bela.interfaces" = ["web/*.html", "web/*.css", "web/*.js", "web/*.svg", "web/*.json", "web/cards/*.svg", "web/cards/hungarian/*.svg", "web/cards/hungarian-illustrated/*.webp"]

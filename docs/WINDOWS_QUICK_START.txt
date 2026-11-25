@@ -24,5 +24,5 @@ folder only if you also want to erase your saved data.
 Open Rules and help > About Bela Lab for the version and release documents.
 TERMS.md, PRIVACY.md, LICENSE.md and NOTICE.md are also in the app folder.
 
-Support: https://github.com/AleksejLeonG/Belote_engine/issues
+Support: https://github.com/AleksejLeonG/Bela-Lab/issues
 Security reports: read SECURITY.md before posting.

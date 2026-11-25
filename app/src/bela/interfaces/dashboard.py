@@ -36,6 +36,8 @@ LEGAL_DOCUMENTS = {"terms": "TERMS.md", "privacy": "PRIVACY.md", "notices": "NOT
 MAX_REQUEST_BYTES = 16 * 1024 * 1024
 CARD_ASSETS = {f"/cards/{suit}.svg" for suit in ("hearts", "leaves", "bells", "acorns")} | {
     f"/cards/hungarian/{suit}_{rank}.svg" for suit in "HSDC"
+    for rank in ("7", "8", "9", "10", "J", "Q", "K", "A")} | {
+    f"/cards/hungarian-illustrated/{suit}_{rank}.webp" for suit in "HSDC"
     for rank in ("7", "8", "9", "10", "J", "Q", "K", "A")}
 
 
@@ -229,7 +231,7 @@ class Dashboard:
     def snapshot(self):
         with self.lock:
             return {"match": match_view(self.match), "saved": self.saved(), "mode":self.mode,
-                "version": __version__, "illustrated_deck": False,
+                "version": __version__, "illustrated_deck": (WEB_ROOT / "cards/hungarian-illustrated").is_dir(),
                 "bot":self.bot_game.public_view() if self.mode == "bots" and self.bot_game else None}
 
     def mutate(self, route, payload):

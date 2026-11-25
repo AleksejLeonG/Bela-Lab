@@ -345,9 +345,8 @@ unchanged H, S, D and C card identities; ober maps to Q and unter to J. The same
 preference applies to live and analysis tables, hands, suit labels and trump
 selection. Switching appearance preserves pending entries and unsaved notes.
 
-The default Hungarian deck uses 32 project-authored SVGs based on the
-traditional Tell deck, with Roman-numeral pips, mirrored court figures and
-seasonal aces.
+The default Hungarian deck uses 32 colorful illustrations in the traditional
+Tell pattern, with Roman-numeral pips, mirrored court figures and seasonal aces.
 See
 [the artwork reference](../app/src/bela/interfaces/web/cards/ATTRIBUTION.md).
 

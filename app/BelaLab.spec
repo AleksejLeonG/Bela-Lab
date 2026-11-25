@@ -27,7 +27,7 @@ web = root / "src/bela/interfaces/web"
 web_assets = [
     (str(path), str(Path("bela/interfaces/web") / path.relative_to(web).parent))
     for path in sorted(web.rglob("*"))
-    if path.suffix in {".html", ".css", ".js", ".svg", ".json"} and path.is_file()
+    if path.suffix in {".html", ".css", ".js", ".svg", ".json", ".webp"} and path.is_file()
 ]
 docs = [
     (str(project / "docs" / name), str(Path("docs") / Path(name).parent))

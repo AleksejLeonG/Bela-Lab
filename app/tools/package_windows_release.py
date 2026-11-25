@@ -42,8 +42,9 @@ def bundled_files():
 
     internal = BUNDLE / "_internal"
     deck = internal / "bela/interfaces/web/cards"
-    if len(list((deck / "hungarian").glob("*.svg"))) != 32:
-        raise ValueError("The release bundle must contain only the project SVG card faces.")
+    for folder, extension in (("hungarian", "svg"), ("hungarian-illustrated", "webp")):
+        if len(list((deck / folder).glob(f"*.{extension}"))) != 32:
+            raise ValueError(f"The release bundle must contain 32 {extension.upper()} card faces.")
     private_names = {"saves", "webview2.nupkg", "early_chat_handover.md", "early_chat_source_summary.md"}
     yield executable, executable.name
     for path in sorted(internal.rglob("*")):

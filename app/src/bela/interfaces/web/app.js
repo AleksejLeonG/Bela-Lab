@@ -68,7 +68,10 @@ async function sendCommand(command, message) { return mutate("/api/command", {co
 function action(fn) { return async event => { try { await fn(event); } catch (error) { showError(error.message); } }; }
 
 function cardMarkup(code, {selected=false, legal=false, disabled=false, table=false} = {}) {
-  return l`<button class="playing-card ${red(code)?"red":""} ${selected?"selected":""} ${legal?"legal":""} ${table?"on-table":""}" data-card="${code}" aria-label="${suitNames()[code[0]]} ${deckRank(code.split("_")[1])}" ${disabled?"disabled":""}><img class="hungarian-face" src="/cards/hungarian/${code}.svg" alt="" aria-hidden="true" draggable="false"><span class="card-rank">${code.split("_")[1]}</span><span class="card-center">${SYMBOLS[code[0]]}</span><span class="card-bottom">${SYMBOLS[code[0]]}</span></button>`;
+  const face = state.illustrated_deck
+    ? `/cards/hungarian-illustrated/${code}.webp`
+    : `/cards/hungarian/${code}.svg`;
+  return l`<button class="playing-card ${red(code)?"red":""} ${selected?"selected":""} ${legal?"legal":""} ${table?"on-table":""}" data-card="${code}" aria-label="${suitNames()[code[0]]} ${deckRank(code.split("_")[1])}" ${disabled?"disabled":""}><img class="hungarian-face" src="${face}" alt="" aria-hidden="true" draggable="false"><span class="card-rank">${code.split("_")[1]}</span><span class="card-center">${SYMBOLS[code[0]]}</span><span class="card-bottom">${SYMBOLS[code[0]]}</span></button>`;
 }
 function picker(target, selected, onPick, disabled = () => false) {
   target.innerHTML = SUITS.map(suit => l`<div class="suit-row"><span class="suit-label ${red(suit)?"red":""}" aria-label="${suitNames()[suit]}">${suitMarkup(suit)}</span>${RANKS.map(rank => {
@@ -402,7 +405,7 @@ $("open-project-status").addEventListener("click",action(async()=>{
   $("status-content").textContent=result.text;$("status-dialog").showModal();
 }));
 function setLegalCopy(target, text){
-  const docsBase="https://github.com/AleksejLeonG/Belote_engine/blob/main/";
+  const docsBase="https://github.com/AleksejLeonG/Bela-Lab/blob/main/";
   const fragment=document.createDocumentFragment();
   let list=null;
   for(const line of text.split(/\r?\n/)){

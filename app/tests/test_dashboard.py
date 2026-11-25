@@ -151,6 +151,10 @@ class HttpDashboardTests(unittest.TestCase):
                 self.assertEqual(status, 200)
                 self.assertEqual(headers["Content-Type"], "image/svg+xml")
                 self.assertIn(b"<svg", body)
+                status, headers, body = self.request("GET", f"/cards/hungarian-illustrated/{suit}_{rank}.webp")
+                self.assertEqual(status, 200)
+                self.assertEqual(headers["Content-Type"], "image/webp")
+                self.assertEqual(body[8:12], b"WEBP")
         self.assertEqual(self.request("GET", "/cards/hungarian/H_2.svg")[0], 404)
 
     def test_knowledge_is_revisioned_read_only_and_contains_no_witness(self):

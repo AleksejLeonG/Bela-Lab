@@ -5,22 +5,22 @@ four-player Croatian Bela. Games and analysis run on your computer.
 
 ## Run the Windows app
 
-**[Download Bela Lab 1.0.0 Setup for Windows](https://github.com/AleksejLeonG/Belote_engine/releases/download/v1.0.0/Bela-Lab-1.0.0-Windows-x64-Setup.exe)** · [Release notes and checksums](https://github.com/AleksejLeonG/Belote_engine/releases/tag/v1.0.0)
+**[Download Bela Lab 1.0.0 Setup for Windows](https://github.com/AleksejLeonG/Bela-Lab/releases/download/v1.0.0/Bela-Lab-1.0.0-Windows-x64-Setup.exe)** · [Release notes and checksums](https://github.com/AleksejLeonG/Bela-Lab/releases/tag/v1.0.0)
 
 ![Bela Lab in dark mode with a Hungarian deck and side-by-side opening lead estimates](docs/images/bela-lab-play.png)
 
 *Opening advice during a demo match. The app compares expected deal points,
 contract odds, and who might take the first trick.*
 
-Sign in to GitHub with access to this repository, download Setup from the
-release, and follow the wizard. Then open **Bela Lab** from the Start menu.
+Download Setup from the release and follow the wizard. Then open
+**Bela Lab** from the Start menu.
 Setup installs for your Windows account and creates an entry in **Settings →
 Apps → Installed apps**. Uninstalling there keeps your saved games, analysis,
 notes, and preferences.
 
 The app requires Windows capable of running x64 programs and
 [Microsoft Edge WebView2 Evergreen Runtime](https://developer.microsoft.com/microsoft-edge/webview2/).
-Setup is unsigned. The [release page](https://github.com/AleksejLeonG/Belote_engine/releases/tag/v1.0.0)
+Setup is unsigned. The [release page](https://github.com/AleksejLeonG/Bela-Lab/releases/tag/v1.0.0)
 also offers a portable ZIP if you prefer to run the app from an extracted folder.
 
 - **Play against bots** to practice a full match, from trump calling to scoring.
@@ -60,7 +60,7 @@ contains and how to remove it.
 - [Terms of Use](TERMS.md) and [Privacy Policy](PRIVACY.md)
 - [Project rights](LICENSE.md) and [third-party notices](NOTICE.md)
 - [Release notes](CHANGELOG.md)
-- [Report a problem](https://github.com/AleksejLeonG/Belote_engine/issues) or [report a security issue](SECURITY.md)
+- [Report a problem](https://github.com/AleksejLeonG/Bela-Lab/issues) or [report a security issue](SECURITY.md)
 
 ## Build and develop
 

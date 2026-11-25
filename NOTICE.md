@@ -4,4 +4,4 @@ The Windows distribution includes CPython, pywebview, bottle, cffi, clr-loader, 
 
 Bela Lab is bundled with PyInstaller under its bootloader redistribution exception. [PyInstaller licence and exception](https://pyinstaller.org/en/stable/license.html)
 
-The release includes Bela Lab's project-authored Hungarian SVG deck and a standard rank-and-suit display. See the repository's [artwork notes](https://github.com/AleksejLeonG/Belote_engine/tree/main/app/src/bela/interfaces/web/cards) for the source deck and provenance. Microsoft, Windows, and WebView2 are Microsoft marks. Bela Lab is an independent project.
+The release includes Bela Lab's illustrated Hungarian deck and a standard rank-and-suit display. See the repository's [artwork notes](https://github.com/AleksejLeonG/Bela-Lab/tree/main/app/src/bela/interfaces/web/cards) for the source deck and provenance. Microsoft, Windows, and WebView2 are Microsoft marks. Bela Lab is an independent project.
