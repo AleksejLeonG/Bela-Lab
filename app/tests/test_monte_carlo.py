@@ -83,6 +83,19 @@ def exact_random_outcomes(state, team):
 
 
 class MonteCarloTests(unittest.TestCase):
+    def test_first_trick_winner_odds_are_reported_for_the_opening_lead(self):
+        match, _ = endgame(played=0)
+        config = MonteCarloConfig(samples=8, policy="random_v1")
+        result = analyze_moves(match, config)
+        self.assertEqual(result["completed_samples"], 8)
+        odds = {row["card"]: row["first_trick_winner_probability"] for row in result["moves"]}
+        self.assertEqual(odds["H_J"], {"self": 1.0, "partner": 0.0, "opponents": 0.0})
+        self.assertEqual(odds["S_7"], {"self": 0.0, "partner": 0.0, "opponents": 1.0})
+        self.assertTrue(all(sum(row.values()) == 1.0 for row in odds.values()))
+        later, _ = endgame()
+        self.assertTrue(all("first_trick_winner_probability" not in row
+                            for row in analyze_moves(later, config)["moves"]))
+
     def test_passing_contract_can_still_lose_match_and_ties_continue(self):
         deal=settle_deal(card_points=(90,62),trick_counts=(4,4),last_trick_team=1,caller_team=0)
         self.assertTrue(deal.caller_passed)

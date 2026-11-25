@@ -7,7 +7,9 @@ import os
 from pathlib import Path
 import sys
 import threading
+from http.client import HTTPConnection
 
+from bela import __version__
 
 def data_directory():
     return Path(os.environ.get("LOCALAPPDATA", Path.home() / ".local" / "share")) / "Bela Lab"
@@ -15,6 +17,7 @@ def data_directory():
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Bela Lab desktop")
+    parser.add_argument("--version", action="version", version=f"Bela Lab {__version__}")
     parser.add_argument("--data-dir", type=Path, default=data_directory())
     parser.add_argument("--port", type=int, default=18766)
     parser.add_argument("--smoke-test", action="store_true", help=argparse.SUPPRESS)
@@ -55,9 +58,21 @@ def main(argv=None):
         if args.smoke_test:
             def check():
                 # Exercise the actual Windows renderer, not a browser stand-in.
-                result = window.evaluate_js("JSON.stringify({title:document.title,cards:document.querySelectorAll('.hungarian-face').length,shell:document.documentElement.dataset.shell})")
-                (root / "smoke.json").write_text(str(result), encoding="utf-8")
-                window.destroy()
+                connection = HTTPConnection("127.0.0.1", server.server_address[1], timeout=5)
+                try:
+                    result = json.loads(window.evaluate_js("JSON.stringify({title:document.title,cards:document.querySelectorAll('.hungarian-face').length,shell:document.documentElement.dataset.shell})"))
+                    for key, path in (("state", "/api/state"), ("terms", "/api/legal/terms"), ("privacy", "/api/legal/privacy")):
+                        connection.request("GET", path)
+                        with connection.getresponse() as response:
+                            data = json.load(response)
+                        if key == "state":
+                            result.update(version=data["version"], illustrated_deck=data["illustrated_deck"])
+                        else:
+                            result[key] = bool(data["text"])
+                    (root / "smoke.json").write_text(json.dumps(result), encoding="utf-8")
+                finally:
+                    connection.close()
+                    window.destroy()
             window.events.loaded += check
         webview.settings["ALLOW_DOWNLOADS"] = True
         webview.start(gui="edgechromium", private_mode=False, storage_path=str(root / "webview"))

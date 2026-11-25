@@ -66,6 +66,21 @@ async function main(){
   assert.equal(vm.runInContext('adviceJob',context),null);
   const html=fs.readFileSync(path.join(__dirname,"../src/bela/interfaces/web/index.html"),"utf8");
   assert.match(html,/<details[^>]*id="advice-experimental"[^>]*>/);
+  Object.assign(context,{red:()=>false,escapeHtml:x=>x,cardLabel:x=>x});
+  const winner={self:0.25,partner:0.1,opponents:0.65};
+  context.opening={success_definition:"defeat_contract",moves:[
+    {card:"S_K",rank:1,expected_point_difference:-52,success_probability:0.11,first_trick_winner_probability:winner},
+    {card:"C_Q",rank:2,not_separated_from_leader:true,expected_point_difference:-52.4,success_probability:0.10,first_trick_winner_probability:winner},
+  ]};
+  const comparison=vm.runInContext("openingLeadMarkup(opening)",context);
+  assert.match(comparison,/too close to call/);
+  assert.match(comparison,/S_K.*C_Q/);
+  assert.match(comparison,/Defeat their contract/);
+  assert.match(comparison,/You take first trick.*25.0%/);
+  assert.match(comparison,/Partner takes first trick.*10.0%/);
+  assert.match(comparison,/Opponents take first trick.*65.0%/);
+  delete context.opening.moves[0].first_trick_winner_probability;
+  assert.equal(vm.runInContext("openingLeadMarkup(opening)",context),"");
   console.log("Advice revision, match switching, cancellation ordering and settings checks passed.");
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});

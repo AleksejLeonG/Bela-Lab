@@ -134,6 +134,12 @@ class HttpDashboardTests(unittest.TestCase):
                 self.assertTrue(body)
                 self.assertIn("frame-ancestors 'none'", headers["Content-Security-Policy"])
         self.assertEqual(self.request("GET", "/../RULES.md")[0], 404)
+        for name in ("terms", "privacy", "notices"):
+            status, _, body = self.request("GET", f"/api/legal/{name}")
+            self.assertEqual(status, 200)
+            self.assertTrue(json.loads(body)["text"].startswith("# Bela Lab"))
+        self.assertEqual(self.request("GET", "/api/legal/other")[0], 404)
+        self.assertEqual(json.loads(self.request("GET", "/api/state")[2])["version"], "1.0.0")
         for path in ("/review_coach.js", "/review_coach_jobs.js"):
             status, headers, body = self.request("GET", path)
             self.assertEqual(status, 200)
@@ -211,12 +217,15 @@ class HttpDashboardTests(unittest.TestCase):
         job_id = json.loads(body)["id"]
         deadline = monotonic() + 3
         while monotonic() < deadline:
-            status, _, body = self.request("GET", "/api/analysis?id=" + job_id)
+            status, _, body = self.request("GET", "/api/analysis?id=" + job_id,
+                                           headers={"Accept-Language": "hr-HR"})
+            self.assertEqual(status, 200)
             job = json.loads(body)
             if job["state"] == "finished":
                 break
             sleep(.01)
         self.assertEqual(job["state"], "finished")
+        self.assertIsNone(job["error"])
         self.assertEqual(job["result"]["status"], "forced_move")
         self.assertEqual(self.dashboard._path(match["id"]).read_bytes(), before)
         self.assertEqual(self.request("GET", "/api/analysis?id=missing")[0], 404)

@@ -1404,7 +1404,7 @@ dialog::backdrop {
 #rules-dialog, #status-dialog {
   max-width:900px
 }
-#rules-content, #status-content {
+#rules-content, #status-content, #legal-dialog pre {
   white-space:pre-wrap;
   font-family:inherit;
   font-size:12px;

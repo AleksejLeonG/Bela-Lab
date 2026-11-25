@@ -1,0 +1,28 @@
+Bela Lab 1.0.0 for Windows x64
+
+For Setup: Run Bela-Lab-1.0.0-Windows-x64-Setup.exe and follow the wizard.
+Open Bela Lab from the Start menu. To uninstall, find Bela Lab in
+Windows Settings > Apps > Installed apps. Uninstall keeps your saved data.
+
+For the portable ZIP: Extract it to a folder you control. Open Bela Lab.exe
+from that folder and keep _internal alongside it. To remove it, close the app
+and delete the extracted folder.
+
+Use Play against bots to start a match or Manual input to track one.
+
+Microsoft Edge WebView2 Evergreen Runtime is required. If it is missing,
+get it from Microsoft at https://developer.microsoft.com/microsoft-edge/webview2/
+The release is unsigned. Some Windows policies may block unsigned applications.
+The accompanying SHA-256 file lets you verify your download against
+the checksum published with the release.
+
+Saved games, notes, analysis and preferences are stored separately under
+%LOCALAPPDATA%\Bela Lab. Export individual matches from Library. Close the
+app before backing up or deleting the data folder. Delete the separate data
+folder only if you also want to erase your saved data.
+
+Open Rules and help > About Bela Lab for the version and release documents.
+TERMS.md, PRIVACY.md, LICENSE.md and NOTICE.md are also in the app folder.
+
+Support: https://github.com/AleksejLeonG/Belote_engine/issues
+Security reports: read SECURITY.md before posting.

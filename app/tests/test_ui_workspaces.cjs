@@ -23,7 +23,7 @@ const base = process.env.BELA_UI_URL || 'http://127.0.0.1:8778';
       if(size.width>1100 && ['play','review'].includes(view))assert.ok(size.scrollHeight<=size.height+1, `${view}: page overflow ${JSON.stringify(size)}`);
       assert.ok(await page.locator('#error-banner').isHidden(), await page.locator('#error-banner').textContent());
     }
-    for(const viewport of [{width:1920,height:1080},{width:1440,height:900},{width:1366,height:768},{width:390,height:844}]) {
+    for(const viewport of [{width:1920,height:1080},{width:1440,height:900},{width:1366,height:768},{width:780,height:640},{width:390,height:844},{width:320,height:640}]) {
       await page.setViewportSize(viewport);
       await geometry('play');
     }
@@ -44,9 +44,20 @@ const base = process.env.BELA_UI_URL || 'http://127.0.0.1:8778';
     if(await page.locator('[data-review-match]').count()) {
       await page.locator('[data-review-match]').first().click();
       await page.locator('#review-deal').waitFor({timeout:90000});
-      for(const viewport of [{width:1440,height:900},{width:1366,height:768},{width:390,height:844}]) {
+      for(const viewport of [{width:1440,height:900},{width:1366,height:768},{width:780,height:640},{width:390,height:844},{width:320,height:640}]) {
         await page.setViewportSize(viewport);
         await geometry('review');
+        const overlap=await page.locator('#review-hand .playing-card').evaluateAll(cards=>{
+          const boxes=cards.map(card=>card.getBoundingClientRect());
+          return boxes.some((box,i)=>boxes.slice(i+1).some(other=>
+            Math.min(box.right,other.right)-Math.max(box.left,other.left)>1&&
+            Math.min(box.bottom,other.bottom)-Math.max(box.top,other.top)>1));
+        });
+        assert.equal(overlap,false,'Review cards should not overlap');
+        if(viewport.width<=760){
+          const bottom=await page.locator('.sidebar').evaluate(el=>el.getBoundingClientRect().bottom);
+          assert.ok(Math.abs(bottom-viewport.height)<=1,'Mobile Review navigation belongs at the bottom');
+        }
       }
     }
     await page.keyboard.press('Control+1');
@@ -54,6 +65,18 @@ const base = process.env.BELA_UI_URL || 'http://127.0.0.1:8778';
     await page.locator('#app-settings-open').click();
     assert.ok(await page.locator('#app-settings').isVisible());
     await page.keyboard.press('Escape');
+    await page.locator('.app-tools-toggle').click();
+    await page.locator('[data-view=help]').click();
+    await page.locator('[data-legal=privacy]').click();
+    await page.locator('#legal-dialog[open]').waitFor();
+    assert.equal(await page.locator('.legal-copy li').count(),4);
+    assert.ok(await page.locator('.legal-copy a').count()>1);
+    const closeButton=page.locator('#legal-dialog .close-button');
+    assert.ok(await closeButton.evaluate(el=>el.scrollHeight<=el.clientHeight&&el.scrollWidth<=el.clientWidth));
+    await page.locator('#legal-dialog').evaluate(el=>{el.scrollTop=el.scrollHeight});
+    await closeButton.click();
+    await page.locator('#legal-dialog').waitFor({state:'hidden'});
+    await geometry('legal');
     const after=await (await page.request.get(base+'/api/state')).json();
     assert.equal(before.match?.id,after.match?.id);
     assert.equal(before.match?.revision,after.match?.revision);

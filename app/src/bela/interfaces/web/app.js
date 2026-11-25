@@ -131,6 +131,7 @@ function switchTab(tab) {
 }
 function render() {
   const m = state.match;
+  $("version-label").textContent = state.version ? t("Version")+" "+state.version : "";
   $("saved-count").textContent = state.saved.length;
   const ownTeam = m ? m.setup.player % 2 : 0;
   $("score-strip").innerHTML = [0,1].map(team => l`<div class="score-card ${team===ownTeam?"our-team":""}"><div class="score-label">${m && team===ownTeam?t("OUR TEAM"):t("TEAM ")+team} <span>· ${team} + ${team+2}</span></div><div class="score-value">${m?.score[team] ?? 0}<small>points</small></div><span class="suit-icon">${team===ownTeam?"♣":"♤"}</span></div>`).join("") + l`<div class="score-card compact"><div class="score-label">TRUMP</div><div class="score-value">${m?suitPrefix(m.setup.trump)+" "+suitNames()[m.setup.trump]:"—"}</div><div class="score-detail">${m?t("Called by player ")+m.setup.caller:t("Awaiting selection")}</div></div><div class="score-card compact"><div class="score-label">DEAL ${m?.deal_number ?? "—"}</div><div class="score-value">${m?Math.min(m.completed_tricks.length+1,8):"—"}<small>/ 8 tricks</small></div><div class="score-detail">${m?t("Dealer: player ")+m.setup.dealer:t("New match")}</div></div>`;
@@ -400,6 +401,48 @@ $("open-project-status").addEventListener("click",action(async()=>{
   const result=await request("/api/project-status");
   $("status-content").textContent=result.text;$("status-dialog").showModal();
 }));
+function setLegalCopy(target, text){
+  const docsBase="https://github.com/AleksejLeonG/Belote_engine/blob/main/";
+  const fragment=document.createDocumentFragment();
+  let list=null;
+  for(const line of text.split(/\r?\n/)){
+    if(!line||line.startsWith("# ")){list=null;continue;}
+    let node,copy;
+    if(line.startsWith("- ")){
+      if(!list){list=document.createElement("ul");fragment.append(list);}
+      node=document.createElement("li");list.append(node);copy=line.slice(2);
+    }else{
+      list=null;
+      const heading=line.startsWith("## ");
+      node=document.createElement(heading?"h3":"p");fragment.append(node);
+      copy=heading?line.slice(3):line;
+    }
+    let end=0;
+    for(const token of copy.matchAll(/\[([^\]]+)\]\(([^)]+)\)|\*\*([^*]+)\*\*|`([^`]+)`/g)){
+      node.append(copy.slice(end,token.index));
+      const [,label,url,bold,code]=token;
+      const href=url?.startsWith("https://")?url:/^[A-Z]+\.md$/.test(url||"")?docsBase+url:null;
+      if(href){
+        const link=document.createElement("a");link.textContent=label;link.href=href;
+        link.target="_blank";link.rel="noopener noreferrer";node.append(link);
+      }else if(bold||code){
+        const inline=document.createElement(bold?"strong":"code");
+        inline.textContent=bold||code;node.append(inline);
+      }else node.append(label);
+      end=token.index+token[0].length;
+    }
+    node.append(copy.slice(end));
+  }
+  target.replaceChildren(fragment);
+}
+
+document.querySelectorAll("[data-legal]").forEach(button=>button.addEventListener("click",action(async()=>{
+  const result=await request("/api/legal/"+button.dataset.legal);
+  const dialog=$("legal-dialog");
+  $("legal-title").textContent=button.textContent;
+  setLegalCopy(dialog.querySelector(".legal-copy"),result.text);
+  dialog.showModal();
+})));
 initKnowledge();
 initAdvice();
 initTrump();

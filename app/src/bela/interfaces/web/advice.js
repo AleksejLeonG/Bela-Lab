@@ -15,6 +15,30 @@ const mixedAdviceNote="The model treats consistent deals equally and announces b
 const learnedAdviceNote="The other players still use the hidden five-strategy mix. Your future choices are learned first, then held fixed while current moves are compared using separate simulations. Unseen or insufficiently learned positions use a mix of cautious, card-counting and tactical play. Each trial keeps one fallback style across candidate moves. The selected trial count is for evaluation; learning adds up to the same number within the time limit.";
 const directAdviceNote="Your simulated later moves use an equal mix of cautious, card-counting and tactical play, with one style kept across each trial. The other players still use the hidden five-strategy mix. There is no learning stage; the budget is spent comparing your current legal cards.";
 
+function openingLeadMarkup(result){
+  const leader=result?.moves?.find(row=>row.rank===1);
+  if(!leader?.first_trick_winner_probability)return "";
+  const alternative=result.moves.find(row=>row.rank>1&&row.not_separated_from_leader&&row.first_trick_winner_probability);
+  const cards=alternative?[leader,alternative]:[leader];
+  const pct=n=>(100*n).toFixed(1)+"%";
+  const metrics=[
+    ["Expected point difference",row=>`${row.expected_point_difference>0?"+":""}${row.expected_point_difference.toFixed(1)}`],
+    [result.success_definition==="make_contract"?"Make our contract":"Defeat their contract",row=>pct(row.success_probability)],
+    ["You take first trick",row=>pct(row.first_trick_winner_probability.self)],
+    ["Partner takes first trick",row=>pct(row.first_trick_winner_probability.partner)],
+    ["Opponents take first trick",row=>pct(row.first_trick_winner_probability.opponents)],
+  ];
+  const title=alternative?"Opening leads · too close to call":"Opening lead";
+  return `<div class="opening-lead-comparison"><table><caption>${t(title)}</caption><thead><tr><th scope="col">${t("Estimate")}</th>${cards.map(row=>`<th scope="col" class="${red(row.card)?"red":""}">${escapeHtml(cardLabel(row.card))}</th>`).join("")}</tr></thead><tbody>${metrics.map(([label,display])=>`<tr><th scope="row">${t(label)}</th>${cards.map(row=>`<td>${display(row)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+}
+
+function firstTrickDetail(row){
+  const odds=row.first_trick_winner_probability;
+  if(!odds)return "";
+  const split=[odds.self,odds.partner,odds.opponents].map(n=>(100*n).toFixed(1)+"%");
+  return `<small>${t("First trick · you / partner / opponents")}<br>${split.join(" / ")}</small>`;
+}
+
 function syncAdvice(){
   const key=adviceSource();
   if(key!==adviceKey){
@@ -135,7 +159,7 @@ function renderAdvice(){
   }).join("");
   const learning=result.completed_learning_samples?`<div><strong>${result.completed_learning_samples}</strong><span>${t("learning trials")}</span></div>`:"";
   const trialLabel=exact?"consistent layouts":result.method==="learned_policy_monte_carlo_v1"?"evaluation trials":"shared trials";
-  target.innerHTML=`${notice?`<p role="status">${escapeHtml(notice)}</p>`:""}<div class="advice-summary"><div><strong>${exact?result.exact_layouts:result.completed_samples}</strong><span>${t(trialLabel)}</span></div>${learning}<div><strong>${(result.elapsed_seconds).toFixed(2)} s</strong><span>${t("analysis time")}</span></div><div><strong>${result.moves.length}</strong><span>${t("legal moves compared")}</span></div></div><section class="panel advice-results"><div class="panel-heading"><div><span class="section-kicker">${t("MODEL ESTIMATES")}</span><h2>${success}</h2><p>${t(status[result.status]||"Analysis stopped.")}</p></div></div><div class="advice-scroll"><table class="advice-table"><thead><tr><th>#</th><th>${t("Card")}</th><th>${t("Our points")}</th><th>${t("Their points")}</th><th>${t("Difference")}</th><th>${t(exact?"Contract":"Success / 95% range")}</th><th>${t("Comparison")}</th></tr></thead><tbody>${rows}</tbody></table></div><p class="input-hint">${t("Points are settled scores after contract failure and bonuses. Click a card to select it at the table; record it only after it is played.")}</p></section>`;
+  target.innerHTML=`${notice?`<p role="status">${escapeHtml(notice)}</p>`:""}<div class="advice-summary"><div><strong>${exact?result.exact_layouts:result.completed_samples}</strong><span>${t(trialLabel)}</span></div>${learning}<div><strong>${(result.elapsed_seconds).toFixed(2)} s</strong><span>${t("analysis time")}</span></div><div><strong>${result.moves.length}</strong><span>${t("legal moves compared")}</span></div></div>${openingLeadMarkup(result)}<section class="panel advice-results"><div class="panel-heading"><div><span class="section-kicker">${t("MODEL ESTIMATES")}</span><h2>${success}</h2><p>${t(status[result.status]||"Analysis stopped.")}</p></div></div><div class="advice-scroll"><table class="advice-table"><thead><tr><th>#</th><th>${t("Card")}</th><th>${t("Our points")}</th><th>${t("Their points")}</th><th>${t("Difference")}</th><th>${t(exact?"Contract":"Success / 95% range")}</th><th>${t("Comparison")}</th></tr></thead><tbody>${rows}</tbody></table></div><p class="input-hint">${t("Points are settled scores after contract failure and bonuses. Click a card to select it at the table; record it only after it is played.")}</p></section>`;
   target.querySelectorAll("[data-advice-card]").forEach(button=>button.addEventListener("click",()=>{
     const row=result.moves.find(r=>r.card===button.dataset.adviceCard);
     if(adviceSource()!==adviceKey||!adviceOwnTurn()||!state.match.legal_cards.includes(row.card))return;

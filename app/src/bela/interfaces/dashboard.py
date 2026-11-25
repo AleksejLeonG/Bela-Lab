@@ -16,7 +16,8 @@ from bela.analysis.knowledge import knowledge_view
 from bela.domain.cards import Card
 from bela.domain.melds import BelotResult
 from bela.storage.persistence import _invalid_constant, _object, _unique_object
-from bela.paths import DOCS_ROOT, EXAMPLES_ROOT, SAVES_ROOT
+from bela import __version__
+from bela.paths import DOCS_ROOT, EXAMPLES_ROOT, RESOURCE_ROOT, SAVES_ROOT
 from bela.rules.play import card_points, trick_winner
 from bela.gameplay.tracking import UserMatch, ValidationLimit
 from bela.gameplay.bot_game import BotGame
@@ -31,6 +32,7 @@ from bela.storage.user_storage import (_command, _setup, dumps_user_match, event
 
 
 WEB_ROOT = Path(__file__).with_name("web")
+LEGAL_DOCUMENTS = {"terms": "TERMS.md", "privacy": "PRIVACY.md", "notices": "NOTICE.md"}
 MAX_REQUEST_BYTES = 16 * 1024 * 1024
 CARD_ASSETS = {f"/cards/{suit}.svg" for suit in ("hearts", "leaves", "bells", "acorns")} | {
     f"/cards/hungarian/{suit}_{rank}.svg" for suit in "HSDC"
@@ -227,6 +229,7 @@ class Dashboard:
     def snapshot(self):
         with self.lock:
             return {"match": match_view(self.match), "saved": self.saved(), "mode":self.mode,
+                "version": __version__, "illustrated_deck": False,
                 "bot":self.bot_game.public_view() if self.mode == "bots" and self.bot_game else None}
 
     def mutate(self, route, payload):
@@ -411,7 +414,7 @@ def make_server(dashboard: Dashboard, port=8765):
             self.end_headers()
 
         def _json(self, status, data):
-            if "error" in data:
+            if isinstance(data.get("error"), str):
                 data = {**data, "error": translate(data["error"], self.headers.get("Accept-Language", "en"))}
             raw = json.dumps(data, ensure_ascii=False, allow_nan=False).encode("utf-8")
             self._headers(status, "application/json; charset=utf-8", len(raw))
@@ -471,6 +474,15 @@ def make_server(dashboard: Dashboard, port=8765):
                     self._json(200, {'text':(DOCS_ROOT/'PROJECT_STATUS.md').read_text(encoding='utf-8')})
                 except OSError:
                     self._json(503, {'error':'The project status document is unavailable.'})
+            elif path.startswith("/api/legal/"):
+                document = LEGAL_DOCUMENTS.get(path.removeprefix("/api/legal/"))
+                if document is None:
+                    self._json(404, {"error": "Document not found."})
+                else:
+                    try:
+                        self._json(200, {"text": (RESOURCE_ROOT / document).read_text(encoding="utf-8")})
+                    except OSError:
+                        self._json(503, {"error": "The release document is unavailable."})
             elif path == "/api/export":
                 with dashboard.lock:
                     if dashboard.match is None:
@@ -481,7 +493,11 @@ def make_server(dashboard: Dashboard, port=8765):
                                   extra={"Content-Disposition": f'attachment; filename="{dashboard.match.id}.player.json"'})
                     self.wfile.write(raw)
             elif path in CARD_ASSETS:
-                raw = (WEB_ROOT / path[1:]).read_bytes()
+                try:
+                    raw = (WEB_ROOT / path[1:]).read_bytes()
+                except FileNotFoundError:
+                    self._json(404, {"error": "Card artwork is unavailable in this build."})
+                    return
                 self._headers(200, "image/webp" if path.endswith(".webp") else "image/svg+xml", len(raw))
                 self.wfile.write(raw)
             elif path == "/locale.js":

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bela-engine"
-version = "0.5.0"
+dynamic = ["version"]
 description = "Engine for the agreed Croatian four-player Bela variant"
 requires-python = ">=3.11"
 dependencies = []
@@ -21,6 +21,9 @@ bela-batch = "bela.interfaces.batch_cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.dynamic]
+version = {attr = "bela.__version__"}
 
 [tool.setuptools.package-data]
 "bela.interfaces" = ["web/*.html", "web/*.css", "web/*.js", "web/*.svg", "web/*.json", "web/cards/*.svg", "web/cards/hungarian/*.svg"]

@@ -97,7 +97,7 @@ class AnalysisJobs:
 
 def interactive_config(data):
     required = {"samples", "seconds", "seed", "policy", "objective"}
-    optional = {"self_policy", "learning_samples", "exact_endgame"}
+    optional = {"self_policy", "learning_samples", "exact_endgame", "auction_weighting"}
     if not isinstance(data, dict) or not required <= set(data) or set(data) - required - optional:
         raise ValueError("Expected analysis samples, seconds, seed, policy and objective.")
     config = MonteCarloConfig(**data)

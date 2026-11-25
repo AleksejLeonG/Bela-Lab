@@ -4,6 +4,8 @@ The desktop application uses the existing Python engine with pywebview and Windo
 
 ## Open the app
 
+Download **[Bela Lab 1.0.0 Setup](https://github.com/AleksejLeonG/Belote_engine/releases/download/v1.0.0/Bela-Lab-1.0.0-Windows-x64-Setup.exe)** and run it. Sign in to GitHub with access to this repository to download the installer. The per-user wizard creates a Start menu shortcut and a Windows uninstall entry.
+
 Use the **Bela Lab** desktop or Start menu shortcut, or `START_BELA.cmd` in the project root. The installed application contains Python and its required libraries. Windows WebView2 must be available (it is present on the development computer).
 
 - Application: `%LOCALAPPDATA%/Programs/Bela Lab/Bela Lab.exe`
@@ -11,7 +13,9 @@ Use the **Bela Lab** desktop or Start menu shortcut, or `START_BELA.cmd` in the 
 - Display preferences: `%LOCALAPPDATA%/Bela Lab/webview`
 - Startup diagnostics: `%LOCALAPPDATA%/Bela Lab/desktop.log`
 
-The initial installation copies active matches, private bot checkpoints, advice journals and review notes from the project. Subsequent installs preserve the app's existing data. The developer browser dashboard and the installed app have separate save folders after that first copy; they do not synchronize.
+Setup keeps the desktop app's existing matches, notes, and preferences. The desktop app and developer dashboard use separate save folders. The development install script below can import project saves when it first creates the desktop data folder.
+
+To remove the installed app, open **Settings → Apps → Installed apps**, find **Bela Lab**, and choose **Uninstall**. This removes the program and Setup-created shortcut. The separate `%LOCALAPPDATA%\Bela Lab` folder remains available for reinstalling or backing up.
 
 Closing the window cancels active analysis and shuts down its loopback server. Opening the app twice focuses the existing window. Nothing needs to be started in a terminal. The loopback port is 18766, separate from the developer dashboard on 8766. Downloads use the native WebView download flow. Saves are outside the installation so replacing the executable does not replace games.
 
@@ -26,7 +30,36 @@ app/.venv/Scripts/python.exe -m PyInstaller --noconfirm app/BelaLab.spec
 powershell -ExecutionPolicy Bypass -File app/tools/install_desktop.ps1
 ```
 
-The icon is tracked in `app/assets/bela-lab.ico`. The spec bundles the frontend, all card artwork, reference docs and examples. The build goes to ignored `dist/Bela Lab/`. Close an installed Bela Lab before updating. No administrator account is needed. This personal build is unsigned.
+The icon is tracked in `app/assets/bela-lab.ico`. The spec bundles the frontend, the project-authored Hungarian SVG deck, the in-app legal documents, the rules and a demo. The build goes to ignored `dist/Bela Lab/`. Close an installed Bela Lab before updating. No administrator account is needed.
+
+## Package version 1.0.0
+
+Build the executable first using the Windows x64 release environment. The
+1.0.0 notices correspond to the bundled CPython 3.12.14 runtime and its
+native libraries. Recheck them whenever the Python or WebView2 SDK build changes.
+
+```powershell
+app/.venv/Scripts/python.exe app/tools/package_windows_release.py
+```
+
+This creates `dist/Bela-Lab-1.0.0-Windows-x64.zip` and its `.zip.sha256` file.
+The ZIP includes setup and removal instructions, legal documents, and the
+third-party licence files. Extract it and open **Bela Lab.exe**. This portable
+package is unsigned and uses the WebView2 Evergreen runtime already installed
+on the computer.
+
+To build the Setup wizard, install [Inno Setup 6](https://jrsoftware.org/inno-setup/downloads)
+and compile the verified ZIP payload.
+
+```powershell
+.\app\tools\build_windows_installer.ps1 -ReleaseZip dist/Bela-Lab-1.0.0-Windows-x64.zip
+```
+
+Pass `-Compiler` with the path to `ISCC.exe` if it is outside the usual locations.
+The command writes the versioned **Setup.exe** and checksum under `dist/`.
+Verify Start menu launch and uninstallation with an isolated program folder,
+and verify that saved data survives. Publish the Setup and its checksum as
+the primary GitHub release assets, alongside the portable ZIP and its checksum.
 
 For source development, run `app/.venv/Scripts/python.exe app/desktop.py`. For the browser-based development dashboard, run `python app/run.py`. Existing text and simulation commands remain available through `app/run.py`.
 

@@ -182,8 +182,16 @@
 :root .knowledge-player,:root .knowledge-section{border-radius:4px;box-shadow:none}
 /* Settings, archives, declarations and all other dialogs share form controls. */
 :root dialog{color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:24px;max-height:85dvh;box-shadow:0 12px 40px #0002}:root dialog::backdrop{background:#101b1466;backdrop-filter:none}
-:root .dialog-heading{padding-bottom:16px;margin-bottom:16px;border-bottom:1px solid var(--line)}:root .dialog-heading h2{font-size:var(--type-section)}
-:root .close-button{color:var(--muted);border-radius:4px;width:28px;height:28px;padding:0;font-size:var(--type-score);background:none}:root .close-button:hover{background:var(--surface-raised)}
+:root .dialog-heading{position:sticky;top:0;z-index:2;gap:12px;padding-bottom:12px;margin-bottom:16px;border-bottom:1px solid var(--line);background:var(--surface);box-shadow:0 -24px 0 var(--surface)}
+:root .dialog-heading h2{min-width:0;margin:0;font-size:var(--type-section);overflow-wrap:anywhere}
+:root .close-button{display:grid;place-items:center;flex:none;width:36px;height:36px;padding:0;border:1px solid var(--line);border-radius:4px;color:var(--ink);background:var(--surface-raised);font-size:22px;line-height:1;cursor:pointer}
+:root .close-button:hover{border-color:var(--accent);color:var(--deep)}
+:root :is(#rules-content,#status-content,.legal-copy){color:var(--ink);font-size:var(--type-body);line-height:1.6;overflow-wrap:anywhere}
+:root .legal-copy h3{margin:20px 0 6px;font-size:var(--type-section)}
+:root .legal-copy p,:root .legal-copy ul{margin:0 0 10px}
+:root .legal-copy li+li{margin-top:6px}
+:root .legal-copy code{font-size:.95em}
+:root #view-help [data-legal]{margin:2px 0}
 :root #app-settings{width:520px}:root .preference-row{display:grid;grid-template-columns:1fr 180px;gap:24px;padding:16px 0;align-items:center;border-bottom:1px solid var(--line)}:root .preference-row:last-child{border-bottom:0;padding-bottom:0}
 :root .preference-row label{font-size:var(--type-body);color:var(--ink);font-weight:var(--weight-medium)}:root .preference-row p{font-size:var(--type-caption);color:var(--muted);margin:4px 0 0}:root .preference-row>select,:root .preference-row>button{width:100%;max-width:none;min-height:34px;font-size:var(--type-body)}
 :root .compact-picker button,:root .large-picker button{border-radius:3px}:root .large-picker{gap:4px}:root .picker-heading{font-size:var(--type-body)}:root #live-details-dialog{width:720px;max-width:calc(100vw - 32px)}:root .live-details-content{max-height:65dvh;overflow-y:auto;font-size:var(--type-body)}
@@ -413,4 +421,76 @@
   :root .table-board { --trick-card-width:50px; --trick-side-offset:44px; --trick-vertical-offset:28px; }
   :root .bot-mode #table-board { --trick-center:21%; }
   :root #review-table { --trick-center:36%; }
+}
+
+/* Fit complete card faces to each lane. Two rows keep the mobile ranks readable. */
+:root body.analysis-mode #review-hand,
+:root .bot-mode #table-board #my-hand {
+  grid-template-columns:repeat(var(--hand-columns,var(--hand-count)),minmax(0,1fr));
+  max-width:calc(var(--hand-columns,var(--hand-count)) * (var(--hand-card-width) + 6px) - 6px);
+  gap:8px 6px;
+  padding:5px 4px;
+}
+:root body.analysis-mode #review-hand .playing-card,
+:root .bot-mode #table-board #my-hand .bot-hand-card,
+:root .bot-mode #table-board #my-hand .playing-card { width:100%;min-width:0; }
+:root body.analysis-mode #review-hand .playing-card,
+:root .bot-mode #table-board #my-hand .playing-card { height:auto;aspect-ratio:5 / 7; }
+:root .bot-mode #table-board .bot-card-estimate span { flex-wrap:wrap;justify-content:center;gap:0 4px;white-space:normal; }
+:root body.live-mode:not(.bot-mode) #my-hand { flex-wrap:wrap; }
+:root .review-workbench-pane,:root [data-inspector-pane],:root .help-copy { min-width:0;overflow-wrap:anywhere; }
+:root .review-workbench-pane pre { white-space:pre-wrap;overflow-wrap:anywhere; }
+
+/* Calling and declarations contain variable-height text. Keep them in flow. */
+:root .bot-mode #table-board:has(>:is(.calling-stage,.table-declaration-stage)) {
+  display:flex;flex-direction:column;align-items:stretch;gap:12px;
+  padding:12px 16px;min-height:0;
+}
+:root .bot-mode #table-board>:is(.calling-stage,.table-declaration-stage) {
+  position:static;inset:auto;width:min(100%,560px);margin:0 auto;max-height:none;
+  min-height:0;flex:1;overflow-y:auto;
+}
+:root .bot-mode #table-board:has(>.table-declaration-stage)>:is(.seat,.trick-card) { display:none; }
+:root .bot-mode #table-board:has(>:is(.calling-stage,.table-declaration-stage))>.hand-panel {
+  position:static;flex:none;min-width:0;
+}
+:root #table-board:has(>.table-declaration-stage) .bot-card-estimate:empty { display:none; }
+
+@media (min-width:1101px) and (max-height:699px) {
+  :root body.live-mode main,:root body.analysis-mode main { overflow-y:auto; }
+  :root #view-table,:root #view-review { flex:1 0 auto; }
+  :root #view-table>.workspace,:root .bot-mode #view-table>.workspace { min-height:560px; }
+  :root #review-content { height:auto; }
+  :root body.analysis-mode .analysis-layout.review-workspace { min-height:525px; }
+  :root body.analysis-mode .analysis-play-column,:root body.analysis-mode .review-workbench { height:auto; }
+  :root body.analysis-mode .review-workbench-pane { max-height:420px; }
+}
+@media (max-width:1100px) {
+  :root .bot-mode #table-board:has(>:is(.calling-stage,.table-declaration-stage)) { height:auto; }
+  :root body.analysis-mode #review-table .analysis-hand-panel { bottom:8px; }
+}
+@media (max-width:760px) {
+  :root body.analysis-mode .sidebar { position:fixed;flex-wrap:nowrap;gap:0; }
+  :root .sidebar .app-tools-toggle { color:var(--muted); }
+  :root .sidebar .app-tools-toggle[aria-expanded="true"] { color:var(--deep);background:var(--surface-raised); }
+  :root .sidebar nav>.nav-item.active { color:var(--deep);background:var(--surface-raised); }
+  :root body.analysis-mode #review-hand,:root .bot-mode #table-board #my-hand { --hand-columns:4; }
+  :root body.analysis-mode #review-table { min-height:485px;height:485px;--trick-center:30%; }
+  :root body.analysis-mode #review-table :is(.seat.left,.seat.right) { top:64px; }
+  :root .trick-card.left .trick-card-owner { left:calc(50% - 8px); }
+  :root .trick-card.right .trick-card-owner { left:calc(50% + 8px); }
+  :root .bot-mode #table-board:has(.app-result,.app-empty) { height:auto;min-height:0; }
+  :root .bot-mode #table-board:has(.app-result,.app-empty) :is(.app-result,.app-empty) { position:relative;min-height:280px; }
+  :root .dialog-actions { flex-wrap:wrap; }
+}
+@media (max-width:360px) {
+  :root .page-header { gap:8px;align-items:flex-start; }
+  :root .page-header h1 { white-space:normal;overflow-wrap:anywhere; }
+  :root .header-actions { justify-content:flex-end;flex-wrap:wrap;max-width:56%; }
+  :root .analysis-timeline-heading { flex-wrap:wrap;gap:8px; }
+  :root .analysis-timeline-heading>label { width:100%;min-width:0; }
+  :root .analysis-timeline-heading>label select { min-width:0;max-width:100%; }
+  :root .form-grid { grid-template-columns:minmax(0,1fr); }
+  :root .form-grid .span-two { grid-column:auto; }
+  :root .large-picker .suit-row { grid-template-columns:18px repeat(8,minmax(0,1fr));gap:3px; }
 }

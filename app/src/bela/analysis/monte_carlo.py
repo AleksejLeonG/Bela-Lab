@@ -14,6 +14,7 @@ from time import monotonic, perf_counter
 
 from bela import RULESET_VERSION
 from bela.analysis import exact_endgame
+from bela.analysis.auction import AuctionEvidence
 from bela.analysis.policies import (ANALYSIS_POLICIES, MIXED_POLICY, POLICIES,
                                     PROFILE_NAMES, announce_bela, _choose_from_legal)
 from bela.analysis.lineups import StrategyLineup
@@ -54,10 +55,15 @@ class MonteCarloConfig:
     self_policy: str = SELF_SEARCH
     learning_samples: int | None = None
     exact_endgame: bool = False
+    auction_weighting: bool = False
 
     def __post_init__(self):
         if type(self.exact_endgame) is not bool:
             raise ValueError("The exact endgame setting must be a boolean.")
+        if type(self.auction_weighting) is not bool:
+            raise ValueError("The auction weighting setting must be a boolean.")
+        if self.auction_weighting and self.policy == MIXED_POLICY and self.self_policy != DIRECT_COMPETENT_SELF_POLICY:
+            raise ValueError("Auction weighting requires fixed continuation policies.")
         if type(self.samples) is not int or not 1 <= self.samples <= 10_000:
             raise ValueError("Samples must be an integer between 1 and 10000.")
         if type(self.seconds) not in (int, float) or not isfinite(self.seconds) or not 0 <= self.seconds <= 60:
@@ -75,7 +81,7 @@ class MonteCarloConfig:
                 raise ValueError("Learning samples require the learn-then-evaluate mixed model.")
 
 
-def confidence_interval(mean, low, high, count, family):
+def confidence_interval(mean, low, high, count, family, *, weight_sum=None):
     """Hoeffding + union over every reported metric/pair and every n >= 1.
 
     delta_n = .05 / (family * n * (n+1)); sum 1/(n*(n+1)) = 1.
@@ -83,6 +89,10 @@ def confidence_interval(mean, low, high, count, family):
     into unadjusted per-move, fixed-sample intervals. They can be quite wide.
     """
     radius = (high - low) * sqrt(log(2 * family * count * (count + 1) / .05) / (2 * count))
+    if weight_sum is not None:
+        # For true mean m, W*(X-m) is centered and its range is no wider
+        # than that of X because 0 < W <= 1. Divide the sum bound by sum(W).
+        radius *= count / weight_sum
     return max(low, mean - radius), min(high, mean + radius)
 
 
@@ -127,11 +137,15 @@ def analyze_moves(match, config=None, *, expected_revision=None, cancelled=None)
         "our_match_win_interval": None, "opponent_match_win_interval": None, "match_continue_interval": None,
         "objective_mean": None, "objective_interval": None,
         "not_separated_from_leader": None} for c in legal}
-    totals = {str(c): [0.0] * 9 for c in legal}  # team0/1, contract, objective, sweeps, match win/loss/continue
+    opening_lead = not tracked.completed_tricks and not tracked.current_trick.cards
+    # Team scores, contract, objective, sweeps, match outcomes, opening trick.
+    totals = {str(c): [0.0] * (12 if opening_lead else 9) for c in legal}
     best_counts = {str(c): 0.0 for c in legal}
     paired = {(str(a), str(b)): 0.0 for a, b in combinations(legal, 2)}
     completed = attempts = sampled = discarded = 0
     exact_layouts = 0
+    total_weight = sum_squared_weights = 0.0
+    exact_weight = 0
     proven_ties = set()
     learned = 0
     split = config.policy == MIXED_POLICY and config.self_policy in LEARN_EVALUATE_POLICIES
@@ -152,6 +166,8 @@ def analyze_moves(match, config=None, *, expected_revision=None, cancelled=None)
         elif split:
             search = SelfSearch()
     cancelled = cancelled or (lambda: False)
+    auction = AuctionEvidence(tracked.setup) if config.auction_weighting else None
+    auction_rng = Random(config.seed ^ 0xACE5C0DE) if auction is not None else None
 
     def check():
         if cancelled():
@@ -170,7 +186,11 @@ def analyze_moves(match, config=None, *, expected_revision=None, cancelled=None)
             trick_winner(trick, state.trump).team == team for trick in state.completed_tricks))
         their_sweep = int(not tracked.trick_counts[team] and all(
             trick_winner(trick, state.trump).team == 1-team for trick in state.completed_tricks))
-        return (*result.recorded, success, value, our_sweep, their_sweep, win_now, lose_now, carry_on)
+        outcomes = (*result.recorded, success, value, our_sweep, their_sweep, win_now, lose_now, carry_on)
+        if opening_lead:
+            winner = trick_winner(state.completed_tricks[0], state.trump)
+            outcomes += (int(winner == own), int(winner != own and winner.team == team), int(winner.team != team))
+        return outcomes
 
     try:
         check()
@@ -185,9 +205,10 @@ def analyze_moves(match, config=None, *, expected_revision=None, cancelled=None)
             if config.exact_endgame and (direct or config.policy != MIXED_POLICY) and remaining <= exact_endgame.MAX_CARDS:
                 exact = exact_endgame.evaluate_endgame(
                     bridge, sampler, legal, own, config.policy, outcome, check=check,
+                    auction=auction,
                     seconds=min(exact_endgame.MAX_SECONDS, max(0, deadline - monotonic()) / 4))
                 if exact is not None:
-                    exact_layouts, totals, proven_ties = exact
+                    exact_layouts, exact_weight, totals, proven_ties = exact
                     reason = "exact_endgame"
             train_seed = learning_seed(config.seed, match.id) if split else None
             learning_deadline = (monotonic() + max(0, deadline - monotonic()) / 2) if split else None
@@ -219,6 +240,7 @@ def analyze_moves(match, config=None, *, expected_revision=None, cancelled=None)
                 if not batch.deals:
                     continue
                 sampled += 1
+                weight = auction.trial_weight(batch.deals[0], auction_rng) if auction is not None else 1.0
                 base = bridge.resume(batch.deals[0])
                 root_turn = _prepare_turn(base)
                 seed = rng.getrandbits(128)
@@ -259,15 +281,17 @@ def analyze_moves(match, config=None, *, expected_revision=None, cancelled=None)
                     traces[str(card)] = trace
                 # Commit only after every candidate in this trial has finished.
                 if phase == "evaluation":
+                    total_weight += weight
+                    sum_squared_weights += weight * weight
                     best_value = max(values[3] for values in outcomes.values())
                     winners = [card for card, values in outcomes.items() if values[3] == best_value]
                     for card in winners:
-                        best_counts[card] += 1 / len(winners)
+                        best_counts[card] += weight / len(winners)
                     for card, values in outcomes.items():
                         for index, value in enumerate(values):
-                            totals[card][index] += value
+                            totals[card][index] += weight * value
                     for pair in paired:
-                        paired[pair] += outcomes[pair[0]][3] - outcomes[pair[1]][3]
+                        paired[pair] += weight * (outcomes[pair[0]][3] - outcomes[pair[1]][3])
                 if search is not None and evaluator is None:
                     for card, values in outcomes.items():
                         reward = (values[3] - low) / (high - low)
@@ -289,7 +313,7 @@ def analyze_moves(match, config=None, *, expected_revision=None, cancelled=None)
             return total[3], total[tiebreak] if tiebreak is not None else total[team] - total[1-team]
 
         def mean(value):
-            return float(Fraction(value, exact_layouts))
+            return float(Fraction(value, exact_weight))
 
         ordered = sorted(rows.values(), key=lambda row: (*(-v for v in ranking(row["card"])), row["card"]))
         leader = ordered[0]["card"]
@@ -311,25 +335,30 @@ def analyze_moves(match, config=None, *, expected_revision=None, cancelled=None)
             gap = mean(totals[first][3] - totals[second][3])
             pairs.append({"first": first, "second": second, "mean_difference": gap, "interval": (gap, gap)})
     elif completed:
+        interval_options = {"weight_sum": total_weight} if auction is not None else {}
         for card, total in totals.items():
             row = rows[card]
-            row.update(samples=completed, expected_recorded=(total[0] / completed, total[1] / completed),
-                       sample_best_share=best_counts[card] / completed,
-                       sample_best_interval=confidence_interval(best_counts[card] / completed, 0, 1, completed, family),
-                       our_sweep_probability=total[4] / completed,
-                       opponent_sweep_probability=total[5] / completed,
-                       our_sweep_interval=confidence_interval(total[4] / completed, 0, 1, completed, family) if not tracked.trick_counts[1-team] else (0,0),
-                       opponent_sweep_interval=confidence_interval(total[5] / completed, 0, 1, completed, family) if not tracked.trick_counts[team] else (0,0),
-                       our_match_win_probability=total[6]/completed,
-                       opponent_match_win_probability=total[7]/completed,
-                       match_continue_probability=total[8]/completed,
-                       our_match_win_interval=confidence_interval(total[6]/completed,0,1,completed,family),
-                       opponent_match_win_interval=confidence_interval(total[7]/completed,0,1,completed,family),
-                       match_continue_interval=confidence_interval(total[8]/completed,0,1,completed,family),
-                       expected_point_difference=(total[team] - total[1 - team]) / completed,
-                       success_probability=total[2] / completed, objective_mean=total[3] / completed,
-                       success_interval=confidence_interval(total[2] / completed, 0, 1, completed, family),
-                       objective_interval=confidence_interval(total[3] / completed, low, high, completed, family))
+            row.update(samples=completed, expected_recorded=(total[0] / total_weight, total[1] / total_weight),
+                       sample_best_share=best_counts[card] / total_weight,
+                       sample_best_interval=confidence_interval(best_counts[card] / total_weight, 0, 1, completed, family, **interval_options),
+                       our_sweep_probability=total[4] / total_weight,
+                       opponent_sweep_probability=total[5] / total_weight,
+                       our_sweep_interval=confidence_interval(total[4] / total_weight, 0, 1, completed, family, **interval_options) if not tracked.trick_counts[1-team] else (0,0),
+                       opponent_sweep_interval=confidence_interval(total[5] / total_weight, 0, 1, completed, family, **interval_options) if not tracked.trick_counts[team] else (0,0),
+                       our_match_win_probability=total[6]/total_weight,
+                       opponent_match_win_probability=total[7]/total_weight,
+                       match_continue_probability=total[8]/total_weight,
+                       our_match_win_interval=confidence_interval(total[6]/total_weight,0,1,completed,family),
+                       opponent_match_win_interval=confidence_interval(total[7]/total_weight,0,1,completed,family),
+                       match_continue_interval=confidence_interval(total[8]/total_weight,0,1,completed,family),
+                       expected_point_difference=(total[team] - total[1 - team]) / total_weight,
+                       success_probability=total[2] / total_weight, objective_mean=total[3] / total_weight,
+                       success_interval=confidence_interval(total[2] / total_weight, 0, 1, completed, family, **interval_options),
+                       objective_interval=confidence_interval(total[3] / total_weight, low, high, completed, family, **interval_options))
+            if opening_lead:
+                row["first_trick_winner_probability"] = {
+                    side: wins / total_weight for side, wins in zip(("self", "partner", "opponents"), total[9:])
+                }
         # Keep the requested objective first. Use the other meaningful estimate
         # for exact ties rather than letting card codes decide the order.
         tiebreak = ("success_probability" if config.objective == "point_difference"
@@ -337,8 +366,8 @@ def analyze_moves(match, config=None, *, expected_revision=None, cancelled=None)
         ordered = sorted(rows.values(), key=lambda row: (
             -row["objective_mean"], -row[tiebreak], row["card"]))
         for pair, total in paired.items():
-            mean = total / completed
-            interval = confidence_interval(mean, low - high, high - low, completed, family)
+            mean = total / total_weight
+            interval = confidence_interval(mean, low - high, high - low, completed, family, **interval_options)
             pairs.append({"first": pair[0], "second": pair[1], "mean_difference": mean, "interval": interval})
         leader = ordered[0]["card"]
         for rank, row in enumerate(ordered, 1):
@@ -360,7 +389,10 @@ def analyze_moves(match, config=None, *, expected_revision=None, cancelled=None)
     return {"match_id": bridge.match_id, "revision": bridge.revision, "deal_number": bridge.deal_number,
             "ruleset": RULESET_VERSION, "method": "public_exact_endgame_v1" if exact_layouts else "direct_competent_monte_carlo_v1" if direct else "learned_policy_monte_carlo_v1" if split else (
                 "information_set_monte_carlo_v1" if search is not None else "paired_monte_carlo_v2"),
-            "model": "uniform_consistent_initial_deals", "config": asdict(config),
+            "model": "soft_auction_v1" if auction is not None else "uniform_consistent_initial_deals",
+            "auction_effective_samples": (total_weight ** 2 / sum_squared_weights
+                                          if auction is not None and completed else None),
+            "config": asdict(config),
             "strategy_model": {"mode": "hidden_match_lineups_v1" if config.policy == MIXED_POLICY else "uniform_policy_v1",
                                "assignment_scope": "hypothetical_match",
                                "profiles": [{"id": profile, "name": name, "intended_level": level}

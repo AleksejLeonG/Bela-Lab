@@ -17,6 +17,33 @@ python app/run.py --batch --mode monte-carlo --matches 10 --dry-run
 
 The root `START_BELA.cmd` accepts the same options and runs one level above `app`. Relative user paths resolve from the project root. The old `--tekst` option remains an alias for `--text`.
 
+## Saved-match advice benchmark
+
+The benchmark replays three decisions from the 18 November 2026 match. Freeze
+the player-facing positions once, then keep the same snapshots for future engine
+comparisons. Provide the original player archive on the first run.
+
+```powershell
+python app/benchmarks/saved_match_decisions.py --match "path/to/match.player.json" --output saves/benchmarks/baseline.json
+python app/benchmarks/saved_match_decisions.py --output saves/benchmarks/new-version.json
+python app/benchmarks/saved_match_decisions.py --auction-weighting --output saves/benchmarks/auction-weighted.json
+```
+
+The 128- and 512-trial runs use the same five seeds at each depth and the live
+time limits. Compare leader counts, unresolved runs, completed trial counts,
+elapsed times, and the K♠ versus J♣ gaps in expected points and contract odds.
+Only the proven 7♥/8♥ tie is a pass/fail expectation. The other two decisions
+measure advice stability and trade-offs. The frozen positions and reports stay
+in the ignored `saves/benchmarks/` folder by default.
+
+Auction weighting is opt-in and uses the same sampled layouts and rollouts
+as the uniform baseline. It gives extra weight to layouts compatible with
+the modeled six-card calls and passes. Forced suit choices count less than
+voluntary actions, and every otherwise legal layout keeps positive weight.
+Monte Carlo estimates the unknown talons with four splits per seat. The
+small exact solver integrates all splits. The weighting factors are
+heuristic and have not been calibrated against human calling data.
+
 ## Tests and installation
 
 ```powershell

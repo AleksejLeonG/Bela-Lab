@@ -2,16 +2,23 @@
 from fractions import Fraction
 from math import sqrt
 from pathlib import Path
+from random import Random
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
 import bela.analysis.monte_carlo as mc
+from bela.analysis.auction import AuctionEvidence
 from bela.analysis.endgame_reference import solve_known_endgame
 from bela.analysis.learned_policy import COMPETENT_FALLBACK_PROFILES, fallback_profile
 from bela.analysis.monte_carlo import MonteCarloConfig, analyze_moves
+from bela.analysis.sampling import SampledDeal
 from bela.analysis.self_search import DIRECT_COMPETENT_SELF_POLICY
+from bela.domain.cards import Suit
+from bela.domain.game import Seat
 from bela.storage.user_storage import loads_user_match
 from test_endgame_reference import known_endgame
+from test_monte_carlo import HANDS
 
 
 class DirectCompetentTests(unittest.TestCase):
@@ -90,7 +97,7 @@ class DirectCompetentTests(unittest.TestCase):
         match, _ = known_endgame(played=20)
         base_choose = mc._choose_from_legal
 
-        def choices(samples):
+        def choices(samples, **config):
             selected = []
 
             def record(view, rng, policy, legal):
@@ -99,7 +106,7 @@ class DirectCompetentTests(unittest.TestCase):
                 return move
 
             with patch.object(mc, '_choose_from_legal', side_effect=record):
-                result = analyze_moves(match, self.config(samples=samples))
+                result = analyze_moves(match, self.config(samples=samples, **config))
             self.assertEqual(result['completed_samples'], samples)
             return selected
 
@@ -108,6 +115,50 @@ class DirectCompetentTests(unittest.TestCase):
         self.assertTrue(quick)
         self.assertGreater(len(deep), len(quick))
         self.assertEqual(quick, deep[:len(quick)])
+        self.assertEqual(deep, choices(12, auction_weighting=True))
+
+    def test_auction_weighting_preserves_exact_single_layout_values(self):
+        match, _ = known_endgame(played=20)
+        uniform = analyze_moves(match, self.config(exact_endgame=True))
+        weighted = analyze_moves(match, self.config(exact_endgame=True, auction_weighting=True))
+        self.assertEqual(weighted['model'], 'soft_auction_v1')
+        self.assertEqual(weighted['exact_layouts'], 1)
+        self.assertEqual(weighted['moves'], uniform['moves'])
+
+    def test_passes_and_forced_call_use_soft_six_card_evidence(self):
+        setup = SimpleNamespace(dealer=Seat.THREE, caller=Seat.THREE,
+                                player=Seat.ZERO, trump=Suit.HEARTS)
+        deal = SampledDeal(tuple(sum(1 << c.id for c in hand) for hand in HANDS))
+        evidence = AuctionEvidence(setup)
+        calls = []
+
+        def disagree(view):
+            self.assertEqual(len(view.hand), 6)
+            self.assertTrue(set(view.hand) <= set(HANDS[view.player]))
+            calls.append((view.player, view.state.forced))
+            return SimpleNamespace(action=Suit.SPADES)
+
+        with patch('bela.analysis.auction.advise_trump', side_effect=disagree):
+            weight = evidence.trial_weight(deal, Random(42))
+            self.assertEqual(calls, [(Seat.ONE, False)] * 4 + [(Seat.TWO, False)] * 4
+                             + [(Seat.THREE, True)] * 4)
+            self.assertAlmostEqual(weight, (1 / 2) ** 2 * 2 / 3)
+            calls.clear()
+            self.assertEqual(evidence.exact_weight(deal, lambda: None), 28 * 28 * 56)
+            self.assertEqual(len(calls), 28 * 3)
+
+    def test_auction_weighted_means_use_the_same_weight_for_all_candidates(self):
+        match, _ = known_endgame(played=20)
+        config = self.config(samples=5)
+        uniform = analyze_moves(match, config)
+        with patch.object(mc.AuctionEvidence, 'trial_weight', return_value=0.5):
+            weighted = analyze_moves(match, self.config(samples=5, auction_weighting=True))
+        self.assertEqual(weighted['auction_effective_samples'], 5)
+        for a, b in zip(uniform['moves'], weighted['moves']):
+            self.assertEqual(a['card'], b['card'])
+            self.assertEqual(a['expected_recorded'], b['expected_recorded'])
+            self.assertEqual(a['success_probability'], b['success_probability'])
+            self.assertEqual(a['sample_best_share'], b['sample_best_share'])
 
     def test_direct_mode_rejects_a_learning_budget(self):
         with self.assertRaises(ValueError):

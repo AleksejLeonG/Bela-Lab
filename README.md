@@ -1,59 +1,57 @@
-# Bela Engine
+# Bela Lab 1.0.0
 
-## Desktop app
+Bela Lab is a free Windows desktop app for playing, tracking and reviewing
+four-player Croatian Bela. Games and analysis run on your computer.
 
-Open **Bela Lab** from the desktop or Start menu, or use `START_BELA.cmd`. The Windows app uses the Python engine with a native WebView2 window and a responsive HTML/CSS/JavaScript interface. Build/install instructions and saved-game locations: [Desktop app](docs/DESKTOP_APP.md). The development browser dashboard remains available through `python app/run.py`.
+## Run the Windows app
 
-**[Current project status and recommended setup](docs/PROJECT_STATUS.md)** — the
-single starting point for what is active, checked and still experimental.
+**[Download Bela Lab 1.0.0 Setup for Windows](https://github.com/AleksejLeonG/Belote_engine/releases/download/v1.0.0/Bela-Lab-1.0.0-Windows-x64-Setup.exe)** · [Release notes and checksums](https://github.com/AleksejLeonG/Belote_engine/releases/tag/v1.0.0)
 
-Double-click **START_BELA.cmd** to open the desktop app. Close its window to quit. To work on the browser dashboard, run `python app/run.py`.
+Sign in to GitHub with access to this repository, download Setup from the
+release, and follow the wizard. Then open **Bela Lab** from the Start menu.
+Setup installs for your Windows account and creates an entry in **Settings →
+Apps → Installed apps**. Uninstalling there keeps your saved games, analysis,
+notes, and preferences.
 
-Choose **Try demo** to explore an example, or **New match** to enter your own hand. English is the default. The **English / Hrvatski** selector and **Night mode / Day mode** button are at the top. Both choices are remembered in the app.
+The app requires Windows capable of running x64 programs and
+[Microsoft Edge WebView2 Evergreen Runtime](https://developer.microsoft.com/microsoft-edge/webview2/).
+Setup is unsigned. The [release page](https://github.com/AleksejLeonG/Belote_engine/releases/tag/v1.0.0)
+also offers a portable ZIP if you prefer to run the app from an extracted folder.
 
-On your turn, open **Move advice** to compare legal cards with Monte Carlo
-estimates and uncertainty ranges. These estimates depend on the selected
-simulated-player strategy; see the [advisor guide](docs/MONTE_CARLO.md).
+- **Play against bots** to practice a full match, from trump calling to scoring.
+- **Manual input** records a game played elsewhere and provides advice from your hand and observed play.
+- **Review** replays a saved match, compares moves and lets you explore alternate lines.
+- **Library** opens, imports and exports player match archives.
 
-The dashboard opens with the recommended configuration. Alternative strategies
-are inside **Experimental settings**. Trump advice normally uses the existing
-position-aware assessment; Monte Carlo calling is opt-in.
+Move advice compares legal cards using Monte Carlo trials and solves small
+endgames exactly when the work limit allows. Near the end of a match, it can
+rank by the chance of winning or keeping the match alive. Probabilities are
+model estimates. The opening lead comparison shows deal points, contract odds
+and who might take the first trick.
 
-```text
-Bela Engine/
-  START_BELA.cmd       Main launcher
-  README.md            Quick start
-  app/                 Application code, interface and tests
-  docs/                Rules, guides and plans
-  examples/            Demo match archives
-  saves/               Your saved matches
-```
+The interface supports English and Croatian, light and dark appearance, and
+Hungarian and standard card faces. **Rules and help → About Bela Lab** shows the
+version and release documents.
 
-The launcher remains one level above the application code. Existing matches are preserved in `saves/dashboard`, including their original names and contents.
+## Saves and support
 
-Start with the [code map](app/README.md) to find application files, or the
-[documentation index](docs/README.md) to choose a guide.
+The Windows app normally stores data in **%LOCALAPPDATA%\Bela Lab**. Export a
+match from Library before sharing it. Back up or delete the data folder while
+the app is closed. See the [Privacy Policy](PRIVACY.md) for what the folder
+contains and how to remove it.
 
-- [Dashboard guide](docs/DASHBOARD.md)
-- [Agreed rules](docs/RULES.md)
-- [Project workflow](docs/WORKFLOW.md)
-- [Development and test commands](docs/DEVELOPMENT.md)
+- [Terms of Use](TERMS.md) and [Privacy Policy](PRIVACY.md)
+- [Project rights](LICENSE.md) and [third-party notices](NOTICE.md)
+- [Release notes](CHANGELOG.md)
+- [Report a problem](https://github.com/AleksejLeonG/Belote_engine/issues) or [report a security issue](SECURITY.md)
 
-```powershell
-.\START_BELA.cmd --text
-.\START_BELA.cmd --simulator --seed 42
-.\START_BELA.cmd --port 8766
-.\START_BELA.cmd --trump C_9 C_J C_K H_A S_Q D_A
-```
+## Build and develop
 
-Alternatively run `python app/run.py`. Python 3.11 or newer is required. The launcher checks the project's virtual environment, the bundled Codex runtime, then system Python. No extra runtime packages or external account are needed.
+The Python engine and browser dashboard require Python 3.11 or newer. Start
+the local dashboard with **python app/run.py**. **START_BELA.cmd** opens the
+installed desktop app from a checkout.
 
-Six-card [trump advice](docs/TRUMP_CALLING.md) is available through `--trump`.
-The dashboard's **Trump advice** tool adds experimental
-[Monte Carlo calling](docs/MONTE_CARLO_CALLING.md): rank suits and passing with
-expected points, success rates and uncertainty. The existing heuristic remains
-the default caller and fallback. Both run entirely locally.
-
-[Local batch modes](docs/LOCAL_BATCH.md) are available through `--batch --mode fast`
-or `--batch --mode monte-carlo`. Calling now accounts for position. Add
-`--dry-run` to check settings without playing any games.
+- [Windows build and release instructions](docs/DESKTOP_APP.md)
+- [Croatian Bela rules used by the engine](docs/RULES.md)
+- [Development, tests and benchmarks](docs/DEVELOPMENT.md)
+- [Project status](docs/PROJECT_STATUS.md) and [documentation index](docs/README.md)

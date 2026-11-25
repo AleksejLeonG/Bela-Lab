@@ -22,10 +22,10 @@ class _ExactLimit(Exception):
     pass
 
 
-def evaluate_endgame(bridge, sampler, legal, own, policy, score, *, seconds, check):
+def evaluate_endgame(bridge, sampler, legal, own, policy, score, *, seconds, check, auction=None):
     """Return exact model values, and certify outcome ties independent of card choices.
 
-    Layouts are uniform among those satisfying the recorded evidence. Each
+    Layouts satisfy the recorded evidence, with optional auction weighting. Each
     actor's unknown profile is held fixed through the continuation; policies
     receive only their own observations. The optional proof checks every card
     choice in a layout using the same automatic Bela convention as advice.
@@ -85,8 +85,10 @@ def evaluate_endgame(bridge, sampler, legal, own, policy, score, *, seconds, che
     totals = {str(card): [0] * 9 for card in legal}
     proven = {frozenset(map(str, pair)) for pair in combinations(legal, 2)}
     layouts = 0
+    total_weight = 0
     try:
         for deal in sampler.enumerate_deals(tick):
+            weight = auction.exact_weight(deal, tick) if auction is not None else 1
             state = bridge.resume(deal)
             view = observe(state, own)
             constants = {}
@@ -95,13 +97,14 @@ def evaluate_endgame(bridge, sampler, legal, own, policy, score, *, seconds, che
                 key = str(card)
                 constants[key] = invariant(child)
                 for index, value in enumerate(expected(child, prior)):
-                    totals[key][index] += value
+                    totals[key][index] += weight * value
             proven = {pair for pair in proven
                       if all(constants[card] is not None for card in pair)
                       and len({constants[card] for card in pair}) == 1}
             layouts += 1
+            total_weight += weight
     except _ExactLimit:
         return None
     if not layouts:
         return None
-    return layouts, totals, proven
+    return layouts, total_weight, totals, proven

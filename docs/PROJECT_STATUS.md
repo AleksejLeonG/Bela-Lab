@@ -1,14 +1,14 @@
 # Bela Engine — current project status
 
-Updated 10 November 2026. Start here; the other experiment reports are historical
+Updated 25 November 2026 for Bela Lab 1.0.0. Start here; the other experiment reports are historical
 reference, not a list of things you need to configure or repeat.
 
 ## Recommended setup
 
 | Part | What we use |
 | --- | --- |
-| Card advice | Current Monte Carlo search, including preservation of valuable trumps in certain losing tricks |
-| Ranking | Expected team point difference for the current deal |
+| Card advice | Paired Monte Carlo with fixed player models and exact search for small endgames |
+| Ranking | Expected team point difference, with a match-aware objective near the finish |
 | Simulated players | Unknown mixture of five strategies for the other three seats |
 | Default budget | 128 paired trials, up to eight seconds |
 | Trump advice | Position-aware six-card assessment (`position_control_v2`) |
@@ -33,8 +33,7 @@ under a particular simulation model. Neither alone proves strategic strength.**
 
 ## Experiments — available, not recommended defaults
 
-- Direct competent Monte Carlo and learn-then-evaluate card advice: no clear
-  full-match advantage established over the current search.
+- Learn-then-evaluate card advice: no clear full-match advantage established.
 - Shared-search variants: retained in code for research; not dashboard defaults.
 - Monte Carlo trump selection: working, but its initial matched comparison did
   not justify replacing the existing caller.
@@ -74,8 +73,9 @@ gap and a positive paired confidence bound. Close or uncertain estimates are
 not called mistakes. There is no overall accuracy rating, cross-game skill
 profile or trump-calling grade yet. See [the dashboard guide](DASHBOARD.md#stage-2-game-coach).
 Fix practical problems encountered there before reopening strategy research.
-Advice currently targets deal points; score-aware end-of-match decisions,
-individual player modeling and automatic online play remain future work.
+The app shows how likely each side is to take the first trick when comparing
+opening leads. Individual player modeling and automatic online play remain
+outside the desktop app.
 
 The 26 October browser walkthrough completed one full 32-card deal in a short
 match starting at 990–990, including declarations, both advice paths, a history
